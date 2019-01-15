@@ -4,54 +4,93 @@ library(spdep)
 library(RANN)
 library(foreach)
 library(rgdal)
+
 options(scipen=999)
-####### Triangulation [Creacion de Vecinos]  #####
-reg=11
-city=1110101
+
 # setwd("C:/Users/cit1/Documents/Max_P")
 setwd("//SVWIN022/00.cit/05.INVESTIGACION/2018_DELITO_BAC_SPD/Max_P_ej")
-shape=readOGR("Shapes",paste0("mzs_",city),stringsAsFactors=F)
-rownames(shape@data)=shape$id=0:(nrow(shape@data)-1)
-shape$IDMZ=as.character(shape$IDMZ)
+
+####### Triangulation [Creacion de Vecinos]  #####
+
+# Asignar region y ciudad
+reg <- 11
+city <- 1110101
+
+
+# Leer datos - shape manzanas, ciudad -------------------------------------
+
+# Leer shape manzanas ciudad
+shape <- readOGR("Shapes",paste0("mzs_",city),stringsAsFactors=F)
+rownames(shape@data) = shape$id = 0:(nrow(shape@data)-1) # Generar variable índice
+shape$IDMZ = as.character(shape$IDMZ) # Guardar ID Manzana como caracter
+
+# Guardar shape manzana (overwrite)
 writeOGR(shape,"Shapes",paste0("mzs_",city),driver="ESRI Shapefile",overwrite_layer=T)
 
-ciudad = SpatialPointsDataFrame(shape, shape@data, proj4string = CRS(proj4string(shape)))
-ids=ciudad@data
+
+# Preparar datos - centroides ---------------------------------------------
+
+# Extraer los centroides de las manzanas
+ciudad <- SpatialPointsDataFrame(shape, shape@data, proj4string = CRS(proj4string(shape)))
 ciudad$IDMZ=NULL
-coords = coordinates(ciudad)
-IDs = as.numeric(row.names(ciudad))
-vecs1=tri2nb(coords,row.names = IDs) # Delauney Triangulation}
-plot(vecs1,coords)
+ids <- ciudad@data # Lista de IDs por manzana
+coords <- coordinates(ciudad) # Lista de coordenadas
+IDs <- as.numeric(row.names(ciudad)) # Lista de IDs - de nuevo?
 
-metros=900
 
-thresh=foreach(v = 1:length(vecs1)) %do%  {
-  source=coords[v,]
-  neighs=coords[vecs1[[v]],]
-  x=neighs[1,]
-  e=apply(neighs,1, function(x) {
-    d=sqrt((x[1] - source[1])^2 + (x[2] - source[2])^2)
+# Generar traingulación ---------------------------------------------------
+
+vecs1 <- tri2nb(coords, row.names = IDs) # Delauney Triangulation - generar vecinos
+plot(vecs1, coords) # Plotear triangulación
+
+# Fijar conjunto de vecinos ------------------------------------------
+
+metros <- 900 # Definir distancia máxima entre vecinos en metros 
+
+# Función obtiene vecinos que esten a menos de 900 metros ó un mínimo de 3 vecinos 
+thresh <- foreach(v = 1:length(vecs1)) %do%  {
+  
+  # Extraer coordenadas
+  source <- coords[v,] # Coordenadas de cada elemento
+  neighs <- coords[vecs1[[v]],] # Coordenadas de cada vecino
+  x <- neighs[1,] # Coordenadas de cada vecino
+  
+  # Aplicar función cálculo de distancia a cada vecino de cada punto
+  e <- apply(neighs,1, function(x) { 
+    d <- sqrt((x[1] - source[1])^2 + (x[2] - source[2])^2) # Distancia en metros
     d
   })
-  orden=e[order(e)]
-  minimos=orden[1:2]
-  maximos=orden[1:min(3,length(e))]
-  f=unlist(lapply(1:length(e), function(x) { # asigna False
-    (e[x]<metros|names(e[x])%in%names(minimos))&names(e[x])%in%names(maximos)
+  
+  # Ordenar y encontrar vecinos mínimos y máximos
+  orden <- e[order(e)] # Ordenar por distancia
+  minimos <- orden[1:2] # Obtener los 2 vecinos más cercanos
+  maximos <- orden[1:min(3,length(e))] # Obtener los vecinos más lejanos
+  
+ # Vecino en menos de 900 metros ó dentro del conjunto de mínimos y máximos
+  f <- unlist(lapply(1:length(e), function(x) { # asigna False
+    (e[x] < metros | # distancia menor a máximo en metros ó
+      names(e[x]) %in% names(minimos)) & # Vecinos en el conjunto de mínimo Y
+      names(e[x]) %in% names(maximos) # Vecinos en el cojunto de máximos
   }))
+  
 }
 
+# Aplicar función thresh a listado de vecinos
 # obs=1
-vecs=vecs1
+vecs <- vecs1 # Definir objeto vecs
 for (obs in 1:length(vecs1)) {
-  vecs[[obs]]=vecs[[obs]][thresh[[obs]]]
+  vecs[[obs]] <- vecs[[obs]] [thresh[[obs]]]
 }
 
-plot(vecs,coords)
+plot(vecs,coords) # Plotear triangulación final
 
-lw=nb2listw(vecs)
-lineas=listw2lines(lw,coords,proj4string = CRS(proj4string(ciudad)))
-plot.nb(vecs,coords)
+# Traspasar vecindad a líneas
+lw <- nb2listw(vecs) # Spatial Weights For Neighbours Lists
+lineas <- listw2lines(lw, coords, proj4string = CRS(proj4string(ciudad))) # Use Arc-Type Shapefiles For Import And Export Of Weights
+plot.nb(vecs, coords) # Plotear
+
+
+# Guardar shapes ----------------------------------------------------------
 
 writeOGR(lineas,"Shapes","vecinos",driver="ESRI Shapefile",overwrite_layer=T)
 write.nb.gal(vecs, "Datos/weights.gal", oldstyle=TRUE, shpfile=NULL, ind=NULL)
