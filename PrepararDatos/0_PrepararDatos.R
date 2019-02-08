@@ -1,40 +1,57 @@
+# Nombre Programa: 0_PrepararDatos
+# Ubicacion: GitHub/Tesis_RT
+# Autor: Monica Flores
+# Fecha Creacion: 17/02/2018
+# Proyecto: Tesis Doctorado Ricardo Truffello
+# Objetivo: Preparar datos prueba script max_p y montecarlo
+# Output: 
+# Notas:
+
 library(sf)
 library(tidyverse)
 
 # Directorio
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # leer base censal R09
-censo2012_R09 <- readRDS("TotalCenso1992_2017_Persona_Clean_R13.Rds") %>% filter(year == 2012 & region == 9)
+censo2012_R09 <- readRDS("Censo2012_R09.Rds") %>% filter(year == 2012 & region == 9)
 head(censo2012_R09)
 
-# Preparar datos para script max_p
+# Leer shape
+shp_mz <- st_read("Input/mzn_AUC_temuco.shp") %>% 
+  mutate(
+    MANZENT = (CUT*1000000000) + (DISTRITO*10000000) + (1*1000000) + (ZONA*1000) + MANZANA # Rehacer Manzent
+  )
+
+# Preparar datos manzana para script max_p
 R09_mzn_data <- censo2012_R09 %>% 
   mutate(persona=1) %>% 
   group_by(manzent) %>%
   summarise(
-    POB = sum(persona),
-    EDUC = if_else(parentesco ==1, mean(escolaridad)) #Promedio de años escolaridad jefe de hogar
+    POB = sum(persona, na.rm = TRUE),
+    EDUC = mean(if_else(parentesco ==1, escolaridad, NA_integer_), na.rm = TRUE) #Promedio de años escolaridad jefe de hogar por manzana
   )
   
-# Leer shapes
-shp_mz <- st_read("Input/mzn_AUC_temuco.shp")
-# shp_zc <- st_read("Input/zona_AUC_temuco2012.shp")
-
 # Guardar shape para vecindad max_p
-shp_mz_vec <- shp_mz %>% left_join(R09_mzn_data)
-shp_mz_vec %>% st_write("Output/mzn_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
+shp_mz_vec <- shp_mz %>% left_join(R09_mzn_data, by = c("MANZENT" = "manzent"))
 
+# Prueba: Plotear EDUC
+ggplot() + geom_sf(data=shp_mz_vec, aes(fill=-EDUC))
+
+# Guardar shape
+shp_mz_vec %>% st_write("Output/Shape/mzn_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
+# test <- st_read("Output/Shape/mzn_temuco_clean.shp")
 
 # Data para montecarlo-----------------------------------------
 
 #Filtrar por manzanas dentro de temuco
-mzn_temuco <- shp_mz %>% st_set_geometry(NULL) %>% select(manzent)
-c2012_temuco <- censo2012_R09 %>% inner_join(mzn_temuco)
+mzn_temuco <- shp_mz %>% st_set_geometry(NULL) %>% transmute(manzent = MANZENT)
+c2012_temuco <- censo2012_R09 %>% inner_join(mzn_temuco, by = "manzent")
 
-# Calcular centiles escolaridad
-quant_temuco <- quantile(c2012_temuco$escolaridad, probs = seq(0, 1, 0.01), na.rm=TRUE) %>% as.data.frame()
-rownames(quant_R04)
+# Calcular centiles escolaridad basado en el promedio por manzana
+quant_temuco <- quantile(R09_mzn_data$EDUC, probs = seq(0, 1, 0.01), na.rm=TRUE) %>% as.data.frame()
+rownames(quant_temuco)
 
 # Determinar tope centil GSE x ciudad 
 E <- quant_temuco["6%",]
@@ -45,7 +62,6 @@ ABC1 <- quant_temuco["100%",]
 
 # seleccionar base final
 mzn_mont <- c2012_temuco %>% 
-  mutate(persona=1) %>% 
   filter(parentesco==1) %>% #filtrar sólo jefes de hogar
   mutate(
     GSE = case_when(
@@ -57,7 +73,7 @@ mzn_mont <- c2012_temuco %>%
     ),
     centil = percent_rank(escolaridad)
   ) %>% 
-  select(geocode, manzent, persona, nviv, nhog, nper, parentesco, escolaridad, centil, GSE)
+  select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, centil, GSE)
 
 #Guardar
 mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo.Rds")
