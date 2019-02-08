@@ -1,7 +1,7 @@
 # Nombre Programa: 0_PrepararDatos
 # Ubicacion: GitHub/Tesis_RT
 # Autor: Monica Flores
-# Fecha Creacion: 17/02/2018
+# Fecha Creacion: 07/02/2018
 # Proyecto: Tesis Doctorado Ricardo Truffello
 # Objetivo: Preparar datos prueba script max_p y montecarlo
 # Output: 
@@ -18,11 +18,25 @@ setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 censo2012_R09 <- readRDS("Censo2012_R09.Rds") %>% filter(year == 2012 & region == 9)
 head(censo2012_R09)
 
-# Leer shape
+# Leer shape manzanas y arreglar manzent
 shp_mz <- st_read("Input/mzn_AUC_temuco.shp") %>% 
   mutate(
-    MANZENT = (CUT*1000000000) + (DISTRITO*10000000) + (1*1000000) + (ZONA*1000) + MANZANA # Rehacer Manzent
+    MANZENT = (CUT*1000000000) + (DISTRITO*10000000) + (1*1000000) + (ZONA*1000) + MANZANA, # Rehacer Manzent
+    geocode = (CUT*1000000) + (DISTRITO*10000) + (1*1000) + (ZONA)  # Crear codigo zona
   )
+
+# Leer shape zonas y arreglar geocode
+shp_zc <- st_read("Input/zona_AUC_temuco2012.shp") %>% 
+  mutate(
+    geocode = (CUT*1000000) + (COD_DISTRI*10000) + (1*1000) + (COD_ZONA) # Crear codigo zona
+  )
+
+# Guardar shape zona 
+shp_zc %>% st_write("Output/Shape/zona_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
+
+# Data para max_p ---------------------------------------------------------
+
+
 
 # Preparar datos manzana para script max_p
 R09_mzn_data <- censo2012_R09 %>% 
@@ -43,7 +57,10 @@ ggplot() + geom_sf(data=shp_mz_vec, aes(fill=-EDUC))
 shp_mz_vec %>% st_write("Output/Shape/mzn_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
 # test <- st_read("Output/Shape/mzn_temuco_clean.shp")
 
+
 # Data para montecarlo-----------------------------------------
+
+
 
 #Filtrar por manzanas dentro de temuco
 mzn_temuco <- shp_mz %>% st_set_geometry(NULL) %>% transmute(manzent = MANZENT)
