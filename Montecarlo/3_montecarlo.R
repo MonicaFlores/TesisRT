@@ -34,49 +34,44 @@ gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_mediana.Rds") %>% filter(pare
 # Define function that generates data and applies the method of interest
 test<-function(pers, zona){
   
-  # generate sample:
-  # sample<-rnorm(n, loc, scale)
-  
-  # calculate test statistic:
-  # stat<-sqrt(n)*mean(sample)/sd(sample)
-  
   # get test decision:
-  # decision<-abs(stat)>1.96
   decision<- pers == zona
   
   # return result:
   return(list("decision"=decision))
 }
 
-mont1 <- test(gse_mont$GSE_pers, gse_mont$GSE_zona) %>% # Output of TRUEs and FALSEs
+test1 <- test(gse_mont$GSE_pers, gse_mont$GSE_zona) %>% # Output of TRUEs and FALSEs
   as.data.frame() %>% 
   mutate(dec_num = if_else(decision == TRUE, 1, 0))
 
-mont1_result <- mont1 %>% sample_n(1000) %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE))  
+test1_result <- test1 %>% sample_n(1000) %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE))  
 # 0.3560929 probabilidad zona (promedio)
 # 0.3336777 probabilidad zona (mediana)
 # 0.344 probabilidad zona (mediana) - sample_n(1000)
 
 
 # Prueba manzanas
-mont2 <- test(gse_mont$GSE_pers, gse_mont$GSE_mzn) %>% # Output of TRUEs and FALSEs
+test2 <- test(gse_mont$GSE_pers, gse_mont$GSE_mzn) %>% # Output of TRUEs and FALSEs
   as.data.frame() %>% 
   mutate(dec_num = if_else(decision == TRUE, 1, 0))
 
-mont2_result <- mont2 %>% sample_n(1000) %>% summarise(prob_mzn = mean(dec_num, na.rm=TRUE))  
+test2_result <- test2 %>% sample_n(1000) %>% summarise(prob_mzn = mean(dec_num, na.rm=TRUE))  
 # 0.3841399 probabilidad mzn (promedio)
 # 0.4184666 probablidad mzn (mediana)
 # 0.437 probablidad mzn (mediana) - sample_n(1000)
 
+# Prueba test montecarlo
+GSEpersona <- gse_mont$GSE_pers
+GSEzona <- gse_mont$GSE_zona
 
-param_list <- list(gse_mont$GSE_pers, gse_mont$GSE_zona)
+# collect parameter grids in list:
+param_list <- list("pers"=GSEpersona, "zona"=GSEzona)
 
 # Funcion MonteCarlo
-MC_result<-MonteCarlo(test, nrep=1000, param_list) # not working
-# Error in parse(text = paste("func(", paste(param_names, "=param_list[[",  : 
-#                                              <text>:1:6: unexpected '='
-#                                            1: func(=
-#                                                      ^
+MC_result<-MonteCarlo(func=test, nrep=100, param_list=param_list, max_grid = 1000) # not working
+# Error in MonteCarlo(func = test, nrep = 100, param_list = param_list,  : 
+#                       Grid size is very large. If you still want to run the simulation change max_grid.
 
 
 
@@ -95,20 +90,20 @@ MC_result<-MonteCarlo(test, nrep=1000, param_list) # not working
 ######################### Ejemplo ################################
 
 # Define function that generates data and applies the method of interest
-# ttest<-function(n,loc,scale){
-#     
-#   # generate sample:
-#   sample<-rnorm(n, loc, scale)
-#   
-#   # calculate test statistic:
-#   stat<-sqrt(n)*mean(sample)/sd(sample)
-#   
-#   # get test decision:
-#   decision<-abs(stat)>1.96
-#   
-#   # return result:
-#   return(list("decision"=decision))
-# }
+ttest<-function(n,loc,scale){
+
+  # generate sample:
+  sample<-rnorm(n, loc, scale)
+
+  # calculate test statistic:
+  stat<-sqrt(n)*mean(sample)/sd(sample)
+
+  # get test decision:
+  decision<-abs(stat)>1.96
+
+  # return result:
+  return(list("decision"=decision))
+}
 
 # # Funcion resumida
 # ttest<-function(n,loc,scale){
@@ -118,11 +113,20 @@ MC_result<-MonteCarlo(test, nrep=1000, param_list) # not working
 #   return(list("stat"=stat))
 # }
 
+# define parameter grid:
+
+n_grid<-c(50,100,250,500)
+loc_grid<-seq(0,1,0.2)
+scale_grid<-c(1,2)
+
+# collect parameter grids in list:
+param_list=list("n"=n_grid, "loc"=loc_grid, "scale"=scale_grid)
+
 # Funcion MonteCarlo
-# MC_result<-MonteCarlo(func=ttest, nrep=1000, param_list=param_list)
-# 
-# df<-MakeFrame(MC_result)
-# head(df)
+MC_result<-MonteCarlo(func=ttest, nrep=1000, param_list=param_list)
+
+df<-MakeFrame(MC_result)
+head(df)
 
 
 ##  plot estimated densities for the distribution of the t-test with different sample sizes n.
