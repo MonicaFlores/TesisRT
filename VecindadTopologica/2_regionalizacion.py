@@ -16,11 +16,11 @@ import geopandas as gpd
 
 np.random.seed(100)
 
-shp = gpd.read_file("/Users/MoniFlores/Desktop/Tesis RT/Data/Shapes/mzn_gran_concepcion02.shp")
+shp = gpd.read_file("/Users/MoniFlores/Desktop/Tesis RT/Data/Shapes/mzn_temuco.shp")
 w = pysal.open("Output/weights.gal").read()
 z = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values 
 p = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values
-# ValueError: labels ['POB' 'IDMZ'] not contained in axis
+
 
 floor = 500
 solution = pysal.region.Maxp(w, z, floor, floor_variable=p, initial=100) 

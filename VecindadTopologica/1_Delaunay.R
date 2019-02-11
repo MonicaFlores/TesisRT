@@ -1,5 +1,5 @@
 ##### Voronoi #####
-install.packages(c("tripack", "spdep", "RANN", "foreach", "rgdal"))
+# install.packages(c("tripack", "spdep", "RANN", "foreach", "rgdal"))
 
 library(tripack)
 library(spdep)
@@ -16,25 +16,16 @@ setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
 
 ####### Triangulation [Creacion de Vecinos]  #####
 
-#Explorar datos conce
-mzn_conce <- st_read("Input/mzn_concepcion02")
-auc_conce <- st_read("Input/R08_Concepcion")
-gran_conce <- st_read("Input/mzn_gran_concepcion02") # Merge de las 10 comunas del gran concepcion
-#Sobreponer manzanas 2002 a AUC Conce Zonas Censales 2017
-ggplot() + geom_sf(data=auc_conce) + geom_sf(data = mzn_conce, aes(fill="red", alpha=0.2))
-ggplot() + geom_sf(data=auc_conce) + geom_sf(data = gran_conce, aes(fill="red", alpha=0.2))
-#Solo es zona centro de Conce - agregar manzanas San Pedro, Talcahuano
-
 # Leer datos - shape manzanas, ciudad -------------------------------------
 
 # Leer shape manzanas ciudad
 # shape <- readOGR("Shapes",paste0("mzs_",city),stringsAsFactors=F)
-shape <- readOGR("Input/mzn_gran_concepcion02", stringsAsFactors=F)
+shape <- readOGR("Input/mzn_temuco_clean.shp", stringsAsFactors=F)
 rownames(shape@data) = shape$id = 0:(nrow(shape@data)-1) # Generar variable índice
-shape$IDMZ = as.character(shape$IDMZ) # Guardar ID Manzana como caracter
+shape$IDMZ = as.character(shape$MANZENT) # Guardar ID Manzana como caracter
 
 # Guardar shape manzana (overwrite)
-writeOGR(shape, "Shapes","mzn_gran_concepcion02",driver="ESRI Shapefile", overwrite_layer=T)
+writeOGR(shape, "Shapes","mzn_temuco",driver="ESRI Shapefile", overwrite_layer=T)
 
 
 # Preparar datos - centroides ---------------------------------------------
