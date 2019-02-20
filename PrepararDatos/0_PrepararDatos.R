@@ -11,8 +11,8 @@ library(sf)
 library(tidyverse)
 
 # Directorio
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # leer base censal R09
 censo2012_R09 <- readRDS("Censo2012_R09.Rds") %>% filter(year == 2012 & region == 9)
@@ -25,14 +25,14 @@ shp_mz <- st_read("Input/mzn_AUC_temuco.shp") %>%
     geocode = (CUT*1000000) + (DISTRITO*10000) + (1*1000) + (ZONA)  # Crear codigo zona
   )
 
-# Leer shape zonas y arreglar geocode
-shp_zc <- st_read("Input/zona_AUC_temuco2012.shp") %>% 
-  mutate(
-    geocode = (CUT*1000000) + (COD_DISTRI*10000) + (1*1000) + (COD_ZONA) # Crear codigo zona
-  )
-
-# Guardar shape zona 
-shp_zc %>% st_write("Input/zona_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
+# # Leer shape zonas y arreglar geocode
+# shp_zc <- st_read("Input/zona_AUC_temuco2012.shp") %>% 
+#   mutate(
+#     geocode = (CUT*1000000) + (COD_DISTRI*10000) + (1*1000) + (COD_ZONA) # Crear codigo zona
+#   )
+# 
+# # Guardar shape zona 
+# shp_zc %>% st_write("Input/zona_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
 
 # Data para max_p ---------------------------------------------------------
 
@@ -54,13 +54,13 @@ shp_mz_vec <- shp_mz %>% left_join(R09_mzn_data, by = c("MANZENT" = "manzent"))
 ggplot() + geom_sf(data=shp_mz_vec, aes(fill=-EDUC))
 
 # Guardar shape
-shp_mz_vec %>% st_write("Input/mzn_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
+# shp_mz_vec %>% st_write("Input/mzn_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
 # test <- st_read("Output/Shape/mzn_temuco_clean.shp")
 
 
 # Data para montecarlo-----------------------------------------
 
-
+## Calcular GSE a partir de educacion del jefe de hogar
 
 #Filtrar por manzanas dentro de temuco
 mzn_temuco <- shp_mz %>% st_set_geometry(NULL) %>% transmute(manzent = MANZENT)
@@ -109,26 +109,51 @@ prom_zc <- c2012_temuco %>%
       educ_zona > C3 & educ_zona  <= C2 ~ "C2",
       educ_zona > C2 ~ "ABC1"
     ))
-  
+
+# Calculo GSE max_p -------------------------------------------------------
+
+
 ############# Hacer mismo calculo GSE promedio vecindarios max_p #################
 
-# seleccionar base final
-mzn_mont <- c2012_temuco %>% 
-  filter(parentesco==1) %>% #filtrar sólo jefes de hogar
-  mutate(
-    GSE_pers = case_when(
-      escolaridad <= E ~ "E",
-      escolaridad > E & escolaridad <= D ~ "D",
-      escolaridad > D & escolaridad <= C3 ~ "C3",
-      escolaridad > C3 & escolaridad  <= C2 ~ "C2",
-      escolaridad > C2 ~ "ABC1"
-    ),
-    centil_educ_pers = percent_rank(escolaridad)
-  ) %>% 
-  left_join(prom_mzn, by = "manzent") %>% 
-  left_join(prom_zc, by = "geocode") %>% 
-  select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, centil_educ_pers,
-         educ_mzn, educ_zona, GSE_pers, GSE_mzn, GSE_zona)
+# pruebas <- c(1:100)
+# 
+# for (n in pruebas) {
+# 
+#   # Leer base de datos
+#   vecindad <- st_read(glue("{dir_loc}/Vecindad/GSE_maxp_prueba{n}.shp"))
 
-#Guardar
-mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo_mediana.Rds")
+
+# Leer archivo ISMT -------------------------------------------------------
+
+ismt <- readRDS("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data/ISMT2012_R09_mediana.Rds") %>% 
+  select(manzent, ptje_ISMT, GSE_ISMT_pers, ISMTptj, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc)
+
+# unir resultados a base personas ----------------------------------------
+
+  
+  
+  # seleccionar base final
+  mzn_mont <- c2012_temuco %>% 
+    filter(parentesco==1) %>% #filtrar sólo jefes de hogar
+    mutate(
+      GSE_pers = case_when(
+        escolaridad <= E ~ "E",
+        escolaridad > E & escolaridad <= D ~ "D",
+        escolaridad > D & escolaridad <= C3 ~ "C3",
+        escolaridad > C3 & escolaridad  <= C2 ~ "C2",
+        escolaridad > C2 ~ "ABC1"
+      ),
+      centil_educ_pers = percent_rank(escolaridad)
+    ) %>% 
+    left_join(prom_mzn, by = "manzent") %>% # Unir manzana
+    left_join(prom_zc, by = "geocode") %>% # Unir zona censal
+    left_join(ismt, by = "manzent") %>% 
+    select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, centil_educ_pers,
+           educ_mzn, educ_zona, GSE_pers, GSE_mzn, GSE_zona, 
+           ptje_ISMT, GSE_ISMT_pers, ISMTptj, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc)
+  
+  #Guardar
+  # mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo_mediana.Rds")
+  mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo_ismt_mediana.Rds")
+
+# }

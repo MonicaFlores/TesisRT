@@ -13,65 +13,79 @@ library(tidyverse)
 library(MonteCarlo)
 
 # Directorio
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # Leer datos con GSE por manzana
 #gse_mont <- readRDS("Output/Data_Temuco_Montecarlo.Rds") %>% filter(parentesco==1) #filtrar sólo jefes de hogar
-gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_mediana.Rds") %>% filter(parentesco==1) #filtrar sólo jefes de hogar
+# gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_mediana.Rds") %>% filter(parentesco==1) 
+# gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_ismt.Rds") %>% filter(parentesco==1) 
+gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_ismt_mediana.Rds") %>% filter(parentesco==1)
 
-# Leer datos de vecindad max_p
-#### vecindad <- st_read()
+# Calcular probabilidad de coincidir con  GSE Manzana y GSE Zona Censal---------
 
-# Unir datos manzana gse y vecindad 
-# mzn_mont <- mzn_gse %>%  left_join(vecindad, by="manzent")
-
-
-# Montecarlo --------------------------------------------------------------
-
-
-
-# Define function that generates data and applies the method of interest
-test<-function(pers, zona){
-  
-  # get test decision:
-  decision<- pers == zona
-  
-  # return result:
-  return(list("decision"=decision))
+# Definir función detectar si GSE persona y zona geográfica son iguales
+test <- function(pers, zona){
+  decision <- pers == zona  # get test decision
+  return(list("decision"=decision)) # return result:Output of TRUEs and FALSEs
 }
 
-test1 <- test(gse_mont$GSE_pers, gse_mont$GSE_zona) %>% # Output of TRUEs and FALSEs
+## Prueba Zona Censal
+test1 <- test(gse_mont$GSE_ISMT_pers, gse_mont$GSE_ISMT_zc) %>%
   as.data.frame() %>% 
   mutate(dec_num = if_else(decision == TRUE, 1, 0))
 
-test1_result <- test1 %>% sample_n(1000) %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE))  
+test_zc <- test1 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
 # 0.3560929 probabilidad zona (promedio)
 # 0.3336777 probabilidad zona (mediana)
-# 0.344 probabilidad zona (mediana) - sample_n(1000)
+# 0.3867884 probabilidad zona ISMT (mediana)
+
+# Prueba con muestra de 1000 - Zona Censal
+test_zc_sample <- test1 %>% sample_n(1000) %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
+# ~0.344 probabilidad zona (mediana) - sample_n(1000)
 
 
-# Prueba manzanas
-test2 <- test(gse_mont$GSE_pers, gse_mont$GSE_mzn) %>% # Output of TRUEs and FALSEs
+## Prueba manzanas
+test2 <- test(gse_mont$GSE_ISMT_pers, gse_mont$GSE_ISMT_mzn) %>% 
   as.data.frame() %>% 
-  mutate(dec_num = if_else(decision == TRUE, 1, 0))
+  mutate(dec_num = if_else(decision == TRUE, 1, 0)) 
 
-test2_result <- test2 %>% sample_n(1000) %>% summarise(prob_mzn = mean(dec_num, na.rm=TRUE))  
+test_mzn <- test2 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
 # 0.3841399 probabilidad mzn (promedio)
 # 0.4184666 probablidad mzn (mediana)
-# 0.437 probablidad mzn (mediana) - sample_n(1000)
+# 0.4749272 probablidad mzn ISMT (mediana)
 
-# Prueba test montecarlo
-GSEpersona <- gse_mont$GSE_pers
-GSEzona <- gse_mont$GSE_zona
+# Prueba con muestra de 1000 - manzana
+test2_result <- test2 %>% sample_n(1000) %>% summarise(prob_mzn = mean(dec_num, na.rm=TRUE))  
+# ~0.437 probablidad mzn (mediana) - sample_n(1000)
 
-# collect parameter grids in list:
-param_list <- list("pers"=GSEpersona, "zona"=GSEzona)
 
-# Funcion MonteCarlo
-MC_result<-MonteCarlo(func=test, nrep=100, param_list=param_list, max_grid = 1000) # not working
-# Error in MonteCarlo(func = test, nrep = 100, param_list = param_list,  : 
-#                       Grid size is very large. If you still want to run the simulation change max_grid.
+
+# Prueba montecarlo zonas homogeneas --------------------------------------
+
+pruebas <- c(1:100)
+
+# for (n in pruebas) {
+
+result <- map_dbl(pruebas, function(n) {
+  # Leer datos de vecindad max_p
+  vecindad <- st_read(glue("{dir_loc}/Vecindad/GSE_maxp_prueba{n}.shp")) 
+  
+  ## Prueba correspondencia GSE: zona homognea / hogar
+  test3 <- test(vecindad$GSE_pers, vecindad$GSE_maxp) %>%
+    as.data.frame() %>% 
+    mutate(dec_num = if_else(decision == TRUE, 1, 0))
+  
+  test3 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
+  
+})
+
+
+# promedio resultado
+mean(result)
+
+# plotear resultado
+ggplot(result) + geom_density(aes(x=prob_zona))
 
 
 
@@ -165,3 +179,15 @@ head(df)
 # # Tabla
 # MakeTable(output=erg_mean_median, rows="n", cols="scale", digits=2, include_meta=FALSE)
 # 
+
+# Prueba test montecarlo
+GSEpersona <- gse_mont$GSE_pers
+GSEzona <- gse_mont$GSE_zona
+
+# collect parameter grids in list:
+param_list <- list("pers"=GSEpersona, "zona"=GSEzona)
+
+# Funcion MonteCarlo
+MC_result<-MonteCarlo(func=test, nrep=100, param_list=param_list, max_grid = 1000) # not working
+# Error in MonteCarlo(func = test, nrep = 100, param_list = param_list,  : 
+#                       Grid size is very large. If you still want to run the simulation change max_grid.
