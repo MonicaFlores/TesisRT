@@ -6,6 +6,7 @@
 # Objetivo: Preparar datos prueba script max_p y montecarlo
 # Output: 
 # Notas:
+options(scipen = 999)
 
 library(sf)
 library(tidyverse)
@@ -25,11 +26,11 @@ shp_mz <- st_read("Input/mzn_AUC_temuco.shp") %>%
     geocode = (CUT*1000000) + (DISTRITO*10000) + (1*1000) + (ZONA)  # Crear codigo zona
   )
 
-# # Leer shape zonas y arreglar geocode
-# shp_zc <- st_read("Input/zona_AUC_temuco2012.shp") %>% 
-#   mutate(
-#     geocode = (CUT*1000000) + (COD_DISTRI*10000) + (1*1000) + (COD_ZONA) # Crear codigo zona
-#   )
+# Leer shape zonas y arreglar geocode
+shp_zc <- st_read("Input/zona_AUC_temuco2012.shp") %>%
+  mutate(
+    geocode = (CUT*1000000) + (COD_DISTRI*10000) + (1*1000) + (COD_ZONA) # Crear codigo zona
+  )
 # 
 # # Guardar shape zona 
 # shp_zc %>% st_write("Input/zona_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
@@ -45,7 +46,7 @@ R09_mzn_data <- censo2012_R09 %>%
     POB = sum(persona, na.rm = TRUE),
     EDUC = mean(if_else(parentesco ==1, escolaridad, NA_integer_), na.rm = TRUE), #Promedio de años escolaridad jefe de hogar por manzana
     med_educ = median(if_else(parentesco ==1, escolaridad, NA_integer_), na.rm = TRUE)
-  )
+  ) %>% ungroup() 
   
 # Shape para vecindad max_p
 shp_mz_vec <- shp_mz %>% left_join(R09_mzn_data, by = c("MANZENT" = "manzent"))
@@ -54,8 +55,8 @@ shp_mz_vec <- shp_mz %>% left_join(R09_mzn_data, by = c("MANZENT" = "manzent"))
 ggplot() + geom_sf(data=shp_mz_vec, aes(fill=-EDUC))
 
 # Guardar shape
-# shp_mz_vec %>% st_write("Input/mzn_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
-# test <- st_read("Output/Shape/mzn_temuco_clean.shp")
+shp_mz_vec %>% na.omit(POB) %>% st_write("Input/mzn_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
+test <- st_read("Input/mzn_temuco_clean.shp")
 
 
 # Data para montecarlo-----------------------------------------
@@ -94,10 +95,10 @@ prom_mzn <- shp_mz_vec %>% rename(manzent=MANZENT, educ_mzn=med_educ) %>%
 
 # Sacar GSE promedio Zona 
 prom_zc <- c2012_temuco %>% 
-  # mutate(persona = 1) %>% # Dummy persona para calc. población
+  mutate(persona = 1) %>% # Dummy persona para calc. población
   group_by(geocode) %>% 
   summarise(
-    # pob_zona = sum(persona, na.rm = TRUE), # Población zona - promedio 2997 personas
+    pob_zona = sum(persona, na.rm = TRUE), # Población zona - promedio 2997 personas
     educ_zona = median(if_else(parentesco == 1, escolaridad, NA_integer_), na.rm = TRUE) #Promedio de años escolaridad jefe de hogar
   ) %>% 
   ungroup() %>% 
@@ -110,8 +111,37 @@ prom_zc <- c2012_temuco %>%
       educ_zona > C2 ~ "ABC1"
     ))
 
+#Calcular minimo, media, mediana, max poblacion zona censal
+prom_zc %>% 
+  summarise(
+    n_zonas = n(),
+    min= min(pob_zona),
+    max = max(pob_zona),
+    prom = mean(pob_zona),
+    median = median(pob_zona)
+  )
+# n_zonas   min   max  prom median
+#      88   187  6183 2997.  2790.
+
+shp_mz_vec %>% st_set_geometry(NULL) %>% 
+  summarise(
+    n_zonas = n(),
+    min= min(POB, na.rm = TRUE),
+    max = max(POB, na.rm = TRUE),
+    prom = mean(POB, na.rm = TRUE),
+    median = median(POB, na.rm = TRUE)
+  )
+# n_zonas min  max     prom median
+# 1    4207   7 1339 87.26638     68
+
+quant_pob <- quantile(shp_mz_vec$POB, probs = seq(0, 1, 0.1), na.rm=TRUE) %>% as.data.frame()
+
 # Calculo GSE max_p -------------------------------------------------------
 
+# Leer prueba max_p
+prueba1 <- st_read("Shapes/output/output.shp") 
+
+ggplot() + geom_sf(data=prueba1, aes(fill=(cluster))) # + scale_fill_continuous(palette="YlGnBu")
 
 ############# Hacer mismo calculo GSE promedio vecindarios max_p #################
 
