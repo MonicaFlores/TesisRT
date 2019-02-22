@@ -21,13 +21,10 @@ np.random.seed(100)
 #shp = gpd.read_file("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data/Shapes/mzn_temuco.shp")
 shp = gpd.read_file("Shapes/mzn_temuco_filter.shp")
 w = pysal.open("Output/weights_filter.gal").read()
-#z = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values 
-#p = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values
-# Dar vuelta las variables... p población... z homegeneity variable
-p = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values 
-z = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values
+z = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values # eliminar todo menos EDUC
+p = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values # eliminar todo menos POB
 
-floor = 75
+floor = 1500
 solution = pysal.region.Maxp(w, z, floor, floor_variable=p, initial=100) 
 
 solution.p
