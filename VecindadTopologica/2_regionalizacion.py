@@ -6,8 +6,8 @@ Created on Thu Dec  6 15:13:49 2018
 """
 
 #get_ipython().run_line_magic('cd', '//svwin022/00.cit/05.INVESTIGACION/2018_DELITO_BAC_SPD/Max_P_ej')
-#get_ipython().run_line_magic('cd', '/Users/MoniFlores/Desktop/Tesis RT/Data')
-get_ipython().run_line_magic('cd', 'C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data')
+get_ipython().run_line_magic('cd', '/Users/MoniFlores/Desktop/Tesis RT/Data')
+#get_ipython().run_line_magic('cd', 'C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data')
 
 
 import numpy as np
@@ -15,7 +15,7 @@ import pandas as pd
 import geopandas as gpd
 import pysal
 
-np.random.seed(100)
+np.random.seed(50)
 
 #shp = gpd.read_file("/Users/MoniFlores/Desktop/Tesis RT/Data/Shapes/mzn_temuco.shp")
 #shp = gpd.read_file("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data/Shapes/mzn_temuco.shp")
@@ -24,7 +24,7 @@ w = pysal.open("Output/weights_filter.gal").read()
 z = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values # eliminar todo menos EDUC
 p = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values # eliminar todo menos POB
 
-floor = 1500
+floor = 1000
 solution = pysal.region.Maxp(w, z, floor, floor_variable=p, initial=100) 
 
 solution.p
@@ -38,7 +38,7 @@ lbdat.id=lbdat.id-1
 
 shpreg=shp.merge(lbdat,on='id')
 
-shpreg.to_file('Shapes/output')
+shpreg.to_file('Shapes/output_4')
 
 #-------------------------------
 
