@@ -13,8 +13,8 @@ library(tidyverse)
 library(MonteCarlo)
 
 # Directorio
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # Leer datos con GSE por manzana
 #gse_mont <- readRDS("Output/Data_Temuco_Montecarlo.Rds") %>% filter(parentesco==1) #filtrar sólo jefes de hogar
@@ -22,7 +22,8 @@ setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
 # gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_ismt.Rds") %>% filter(parentesco==1) 
 # gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_ismt_mediana.Rds") %>% filter(parentesco==1)
 # gse_mont <- readRDS("Output/Data_Temuco_Montecarlo_cluster.Rds") %>% filter(parentesco==1)
-gse_mont <- readRDS("Output/Data_Temuco_cluster_mediana_educ_4.Rds") %>% filter(parentesco==1)
+# gse_mont <- readRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds") %>% filter(parentesco==1)
+gse_mont <- readRDS("Output/Data_Nunoa_cluster_ismt_1.Rds") %>% filter(parentesco==1)
 head(gse_mont)
 
 # Calcular probabilidad de coincidir con  GSE Manzana y GSE Zona Censal---------
@@ -33,34 +34,94 @@ test <- function(pers, zona){
   return(list("decision"=decision)) # return result:Output of TRUEs and FALSEs
 }
 
-## Prueba Zona 
-test1 <- test(gse_mont$GSE_pers, gse_mont$GSE_zh) %>%
+## Prueba Zona Censal
+test0 <- test(gse_mont$GSE_ISMT_pers, gse_mont$GSE_ISMT_zc) %>%
   as.data.frame() %>% 
   mutate(dec_num = if_else(decision == TRUE, 1, 0))
 
-test1 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
+test0 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
+
+# Temuco
 # 0.3560929 probabilidad zona (promedio)
 # 0.3336777 probabilidad zona (mediana)
 # 0.3798036 probabilidad zona (mediana)  - fitro mzn islas
 # 0.3867884 probabilidad zona ISMT (mediana)
 # 0.385037 probabilidad zona ISMT (mediana) - fitro mzn islas
+# Nunoa
+# 0.4794668 probabilidad zona ISMT 
+# 0.4086112 probabilidad zona EDUC
+
+## Prueba Zona Homogenea
+test1 <- test(gse_mont$GSE_ISMT_pers, gse_mont$GSE_ISMT_zh) %>%
+  as.data.frame() %>% 
+  mutate(dec_num = if_else(decision == TRUE, 1, 0))
+
+test1 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
 
 # 0.2585055 probabilidad zona homogenea 3 (mediana EDUC) - fitro mzn islas - seed 100/floor 1600
-# 0.271439 probabilidad zona homogenea 4 (mediana EDUC) - fitro mzn islas - seed 50/floor 1000
+# 0.271439 probabilidad zona homogenea 4 (mediana EDUC) - fitro mzn islas - seed 50 / floor 1000
+# 0.3221418 probabilidad zona homogenea 5 (mediana ISMT) - seed 100 / floor 1000
+# 0.3175821 probabilidad zona homogenea 6 (mediana ISMT) - seed 100 / floor 1500
+# 0.3148007 probabilidad zona homogenea 7 (random ISMT) - seed 100 / floor 1500
+# 0.3226485 probabilidad zona homogenea 7 (random ISMT) - seed 100 / floor 1000
+
+# Ñuñoa
+# 0.4862735 probabilidad zona homogenea 1 (mediana ISMT) - seed 100 / floor 1000 - 117 zonas
+# 0.4751366 probabilidad zona homogenea 2 (mediana ISMT) - seed 100 / floor 1500 - 81 zonas
+
+# Medir varianza cluster
+gse_mont %>% 
+  mutate(
+    ISMT = as.numeric(scale(ptje_ISMT))
+  ) %>% 
+  group_by(cluster) %>% 
+  summarise(
+    sd_clust = sd(ISMT, na.rm = TRUE)
+  ) %>% ungroup() %>% 
+  summarise(
+    max_sd = max(sd_clust),
+    min_sd = min(sd_clust),
+    mean_sd = mean(sd_clust),
+    med_sd = median(sd_clust)
+  )
+#- max_sd min_sd mean_sd med_sd
+#  1.11   0.597   0.932  0.945
+# Nunoa - 1
+#   1.47  0.573   0.911  0.868
+
+# medir varianza zona censal  
+gse_mont %>% 
+  mutate(
+    ISMT = as.numeric(scale(ptje_ISMT))
+  ) %>% 
+  group_by(geocode) %>% 
+  summarise(
+    sd_clust = sd(ISMT, na.rm = TRUE)
+  ) %>% ungroup() %>% 
+  summarise(
+    max_sd = max(sd_clust),
+    min_sd = min(sd_clust),
+    mean_sd = mean(sd_clust),
+    med_sd = median(sd_clust)
+  )
+# max_sd min_sd mean_sd med_sd
+#  1.09  0.571   0.835  0.862
+# Nunoa
+#  1.29  0.690   0.899  0.861
+
 
 ## Prueba Zona/ manzana
-test2 <- test(gse_mont$GSE_mzn, gse_mont$GSE_zona) %>%
+test2 <- test(gse_mont$GSE_ISMT_mzn, gse_mont$GSE_zh) %>%
   as.data.frame() %>% 
   mutate(dec_num = if_else(decision == TRUE, 1, 0))
 
 test2 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
 # 0.4122869 probabilidad coincidir con GSE manzana / zona homogenea 4 
 # 0.6640931 probabilidad coincidir con GSE manzana / zona censal  
-
-# Prueba con muestra de 1000 - Zona Censal
-test_zc_sample <- test1 %>% sample_n(1000) %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE)) 
-# ~0.344 probabilidad zona (mediana) - sample_n(1000)
-
+# Nunoa
+# 0.8883214 probabilidad coincidir con GSE manzana / zona censal educ  
+# 0.7658846 probabilidad coincidir con GSE manzana / zona censal ISMT
+# 0.7569836 probabilidad coincidir con GSE manzana / zona homogenea ISMT
 
 ## Prueba manzanas
 test3 <- test(gse_mont$GSE_ISMT_pers, gse_mont$GSE_ISMT_mzn) %>% 
@@ -72,10 +133,9 @@ test3 %>% summarise(prob_zona = mean(dec_num, na.rm=TRUE))
 # 0.4184666 probablidad mzn (mediana)
 # 0.4749272 probablidad mzn ISMT (mediana)
 # 0.4866726 probablidad mzn ISMT (mediana) - fitro mzn islas
-
-# Prueba con muestra de 1000 - manzana
-test2_result <- test2 %>% sample_n(1000) %>% summarise(prob_mzn = mean(dec_num, na.rm=TRUE))  
-# ~0.437 probablidad mzn (mediana) - sample_n(1000)
+# Nunoa
+# 0.5118445 probabilidad mzn ISMT
+# 0.4237231 probabilidad mzn/pers
 
 
 

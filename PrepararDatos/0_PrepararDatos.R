@@ -12,64 +12,88 @@ library(sf)
 library(tidyverse)
 
 # Directorio
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
-# leer base censal R09
-censo2012_R09 <- readRDS("Censo2012_R09.Rds") %>% filter(year == 2012 & region == 9)
-head(censo2012_R09)
+# leer base censal 
+# censo2012_R09 <- readRDS("Censo2012_R09.Rds") %>% filter(year == 2012 & region == 9)
+censo2012_R13 <- readRDS("Censo2012_R13.Rds") %>% filter(year == 2012 & region == 13)
+head(censo2012_R13)
 
 # Leer shape manzanas y arreglar manzent
-shp_mz <- st_read("Input/mzn_AUC_temuco.shp") %>% 
+shp_mz <- st_read("Input/mzn_AUC_stgo.shp") %>% 
   mutate(
     MANZENT = (CUT*1000000000) + (DISTRITO*10000000) + (1*1000000) + (ZONA*1000) + MANZANA, # Rehacer Manzent
     geocode = (CUT*1000000) + (DISTRITO*10000) + (1*1000) + (ZONA)  # Crear codigo zona
   )
 
-# Leer shape zonas y arreglar geocode
-# shp_zc <- st_read("Input/zona_AUC_temuco2012.shp") %>%
+#Leer shape zonas y arreglar geocode
+# shp_zc <- st_read("Input/zona_AUC_stgo2012.shp") %>%
 #   mutate(
-#     geocode = (CUT*1000000) + (COD_DISTRI*10000) + (1*1000) + (COD_ZONA) # Crear codigo zona
+#     geocode = (CUT*1000000) + (DISTRITO*10000) + (1*1000) + (ZONA) # Crear codigo zona
 #   )
 # 
-# # Guardar shape zona 
-# shp_zc %>% st_write("Input/zona_temuco_clean.shp", quiet = TRUE, delete_layer = TRUE)
+# # Guardar shape zona
+# shp_zc %>% st_write("Input/zona_AUC_stgo2012_clean.shp", quiet = TRUE, delete_layer = TRUE)
+
+# Leer archivo GSE ISMT -------------------------------------------------------
+
+# ismt <- readRDS("ISMT2012_R09_mediana.Rds") %>%
+ismt <- readRDS("ISMT2012_R13.Rds") %>%
+  mutate(manzent = as.character(manzent)) %>% 
+  select(manzent, folio, nviv, nhogar, ptje_ISMT, GSE_ISMT_pers, 
+         ISMT_mzn, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc)
+
+# Mediana ISMT por manzana
+ismt_mzn <- ismt %>%
+  group_by(manzent) %>% 
+  summarise(
+    ISMT = median(ptje_ISMT, na.rm = TRUE)
+  ) %>% ungroup()
+
+# # Persona random por manzana 
+# ismt_mzn <- ismt %>% 
+#   transmute(manzent = manzent, ISMT = ptje_ISMT) %>%  
+#   group_by(manzent) %>% 
+#   sample_n(1)
 
 # Data para max_p ---------------------------------------------------------
 
-
-# Preparar datos manzana para script max_p
-R09_mzn_data <- censo2012_R09 %>% 
+# Preparar datos manzana para script max_p 
+# R09_mzn_data <- censo2012_R09 %>% 
+R13_mzn_data <- censo2012_R13 %>% 
   mutate(persona=1) %>% 
   group_by(manzent) %>%
   summarise(
     POB = sum(persona, na.rm = TRUE),
     EDUC = median(if_else(parentesco ==1, escolaridad, NA_integer_), na.rm = TRUE) #Mediana de años escolaridad jefe de hogar por manzana
   ) %>% 
-  ungroup() %>% 
+  ungroup() %>%
   filter(!is.na(manzent))
   
 # Shape con info censal
 shp_mz_vec <- shp_mz %>% 
-  left_join(R09_mzn_data, by = c("MANZENT" = "manzent")) %>% 
+  # left_join(R09_mzn_data, by = c("MANZENT" = "manzent")) %>% 
+  left_join(R13_mzn_data, by = c("MANZENT" = "manzent")) %>% 
   mutate(MANZENT= as.character(MANZENT))
-# # Prueba: Plotear EDUC
-# ggplot() + geom_sf(data=shp_mz_vec, aes(fill=-EDUC))
 
 # Shape para max_p
 shp_maxp <- shp_mz_vec %>% 
+  left_join(ismt_mzn, by = c("MANZENT"="manzent")) %>% 
   na.omit(POB) %>% 
+  #filter(CUT == 13120) %>%  # Filtrar comuna = Nunoa
   mutate(
     IDMZ = as.character(MANZENT),
     id = row_number(),
-    EDUC = scale(EDUC)
+    EDUC = as.numeric(scale(EDUC)),
+    ISMT = as.numeric(scale(ISMT))
     ) %>% 
-  select(IDMZ, id, POB, EDUC) 
+  select(IDMZ, id, POB, ISMT) #EDUC) 
 
-# # Guardar shape
-# shp_maxp %>% st_write("Shapes/mzn_temuco.shp", quiet = TRUE, delete_layer = TRUE)
-# 
-# test <- st_read("Shapes/mzn_temuco.shp")
+# Guardar shape
+shp_maxp %>% st_write("Shapes/mzn_stgo_ismt.shp", quiet = TRUE, delete_layer = TRUE)
+
+test <- st_read("Shapes/mzn_stgo_ismt.shp")
 
 
 # Data para montecarlo-----------------------------------------
@@ -77,22 +101,25 @@ shp_maxp <- shp_mz_vec %>%
 ## Calcular GSE a partir de educacion del jefe de hogar
 
 #Filtrar por manzanas dentro de temuco
-mzn_temuco <- shp_mz %>% st_set_geometry(NULL) %>% transmute(manzent = as.character(MANZENT))
+mzn_ciudad <- shp_mz %>% st_set_geometry(NULL) %>% transmute(manzent = as.character(MANZENT))
 
-c2012_temuco <- censo2012_R09 %>% 
+# c2012_ <- censo2012_R09 %>% 
+c2012_ <- censo2012_R13 %>% 
   mutate(manzent = as.character(manzent)) %>%  
-  inner_join(mzn_temuco, by = "manzent")
+  inner_join(mzn_ciudad, by = "manzent")
+
+c2012_jh <- c2012_ %>% filter(parentesco == 1)
 
 # Calcular centiles escolaridad basado en la mediana por manzana
-quant_temuco <- quantile(shp_mz_vec$EDUC, probs = seq(0, 1, 0.01), na.rm=TRUE) %>% as.data.frame()
-rownames(quant_temuco)
+quant <- quantile(c2012_jh$escolaridad, probs = seq(0, 1, 0.01), na.rm=TRUE) %>% as.data.frame()
+rownames(quant)
 
 # Determinar tope centil GSE x ciudad 
-E <- quant_temuco["6%",]
-D <- quant_temuco["36%",]
-C3 <- quant_temuco["64%",]
-C2 <- quant_temuco["79%",]
-ABC1 <- quant_temuco["100%",]
+E <- quant["6%",]
+D <- quant["36%",]
+C3 <- quant["64%",]
+C2 <- quant["79%",]
+ABC1 <- quant["100%",]
 
 # Sacar GSE mediana manzana
 prom_mzn <- shp_mz_vec %>% rename(manzent=MANZENT, educ_mzn=EDUC) %>% 
@@ -110,7 +137,8 @@ prom_mzn <- shp_mz_vec %>% rename(manzent=MANZENT, educ_mzn=EDUC) %>%
   ungroup()
 
 # Sacar GSE promedio Zona 
-prom_zc <- c2012_temuco %>% 
+prom_zc <- c2012_ %>% 
+  #filter(comuna == 13120) %>%  # Filtrar comuna = Nunoa
   mutate(persona = 1) %>% # Dummy persona para calc. población
   group_by(geocode) %>% 
   summarise(
@@ -139,19 +167,30 @@ prom_zc %>%
     prom = mean(pob_zona),
     median = median(pob_zona)
   )
+# Temuco
 # n_zonas   min   max  prom median
 #      88   187  6183 2997.  2790.
 
+# Santiago
+# n_zonas   min   max  prom median
+#   1539    16  10290 3635.   3542
+
+# nunoa 
+# n_zonas   min   max  prom median
+#      55  1751  4712 3398.   3438
+
+
 # Percentiles población 
 quant_pob <- quantile(prom_zc$pob_zona, probs = seq(0, 1, 0.1), na.rm=TRUE) %>% as.data.frame() 
-# Percentil 10 = 1599.4
+# Percentil 10 = 1599.4 Temuco
+# 10%   1974.6 Santiago
 
 # Calculo GSE max_p -------------------------------------------------------
 
 ############# Correr script python vecindarios max_p #################
 
 # Leer output script max_p
-z_homogeneas <- st_read("Shapes/output_4/output_4.shp") %>% 
+z_homogeneas <- st_read("Shapes/output_nunoa_1") %>% 
   st_set_geometry(NULL) %>% 
   mutate(manzent = as.character(IDMZ)) %>% 
   select(manzent, cluster)
@@ -159,26 +198,40 @@ z_homogeneas <- st_read("Shapes/output_4/output_4.shp") %>%
 # Comprobar n clusters = solution.p en script max_p
 test <- z_homogeneas %>% group_by(cluster) %>% summarise(n_obs = n())
 
+# seleccionar ptje ismt por jefe de hogar
+ismt_join <- ismt %>% select(manzent, folio, nviv, nhogar, ptje_ISMT)
+
 # Unir id zonas homogeneas a base censal
-c2012_temuco_clust <- c2012_temuco %>% 
-  left_join(z_homogeneas, by="manzent")
+c2012_clust <- c2012_ %>% 
+  inner_join(z_homogeneas, by="manzent") %>% 
+  left_join(ismt_join, by = c("manzent", "folio", "nviv", "nhogar"))
+
+# Leer quantiles ISMT y redeficnir GSE
+# quant_ISMT <- readRDS("ISMT_quant_R09.Rds")
+quant_ISMT <- readRDS("ISMT_quant_R13.Rds")
+  
+E_ismt <- quant_ISMT["6%",]
+D_ismt <- quant_ISMT["36%",]
+C3_ismt <- quant_ISMT["64%",]
+C2_ismt <- quant_ISMT["79%",]
+ABC1_ismt <- quant_ISMT["100%",]
 
 #Calcular GSE zonas homogeneas
-prom_zh <- c2012_temuco_clust %>%   
+prom_zh <- c2012_clust %>%   
   mutate(persona = 1) %>% 
   group_by(cluster) %>% 
   summarise(
-    pob_zh = sum(persona, na.rm = TRUE), # Población zona - promedio 2997 personas
-    educ_zh = median(if_else(parentesco == 1, escolaridad, NA_integer_), na.rm = TRUE) #Promedio de años escolaridad jefe de hogar
+    pob_zh = sum(persona, na.rm = TRUE), # Población zona 
+    med_ISMT_zh = median(if_else(parentesco == 1, ptje_ISMT, NA_real_), na.rm = TRUE) #Promedio de ISMT jefe de hogar
   ) %>% 
   ungroup() %>% 
   mutate(
-    GSE_zh = case_when(
-      educ_zh <= E ~ "E",
-      educ_zh > E & educ_zh <= D ~ "D",
-      educ_zh > D & educ_zh <= C3 ~ "C3",
-      educ_zh > C3 & educ_zh  <= C2 ~ "C2",
-      educ_zh > C2 ~ "ABC1"
+    GSE_ISMT_zh = case_when(
+      med_ISMT_zh <= E_ismt ~ "E",
+      med_ISMT_zh > E_ismt & med_ISMT_zh <= D_ismt ~ "D",
+      med_ISMT_zh > D_ismt & med_ISMT_zh <= C3_ismt ~ "C3",
+      med_ISMT_zh > C3_ismt & med_ISMT_zh  <= C2_ismt ~ "C2",
+      med_ISMT_zh > C2_ismt ~ "ABC1"
     ))
 
 # pruebas <- c(1:100)
@@ -189,17 +242,12 @@ prom_zh <- c2012_temuco_clust %>%
 #   vecindad <- st_read(glue("{dir_loc}/Vecindad/GSE_maxp_prueba{n}.shp"))
 
 
-# Leer archivo GSE ISMT -------------------------------------------------------
-
-ismt <- readRDS("ISMT2012_R09_mediana.Rds") %>% 
-  mutate(manzent = as.character(manzent)) %>% 
-  select(manzent, ptje_ISMT, GSE_ISMT_pers, ISMTptj, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc)
 
 # unir resultados a base personas ----------------------------------------
   
   
 # seleccionar base final
-mzn_mont <- c2012_temuco_clust %>% 
+mzn_mont <- c2012_clust %>% 
     filter(parentesco==1 & !is.na(cluster)) %>% #filtrar sólo jefes de hogar y NAs zonas homogeneas 
     mutate(
       GSE_pers = case_when(
@@ -210,18 +258,19 @@ mzn_mont <- c2012_temuco_clust %>%
         escolaridad > C2 ~ "ABC1"
       ),
       centil_educ_pers = percent_rank(escolaridad)
-    ) %>% 
+    ) %>%
     left_join(prom_mzn, by = "manzent") %>% # Unir manzana
     left_join(prom_zc, by = "geocode") %>% # Unir zona censal
-    left_join(ismt, by = "manzent") %>% # Unir GSE ISMT manzana y zona censal
+    left_join(ismt, by = c("manzent", "folio", "nviv", "nhogar", "ptje_ISMT")) %>% # Unir GSE ISMT manzana y zona censal
     left_join(prom_zh, by = "cluster") %>% # Unir zonas homogeneas
-    select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, centil_educ_pers,
-           educ_mzn, educ_zona, GSE_pers, GSE_mzn, GSE_zona, 
-           ptje_ISMT, GSE_ISMT_pers, ISMTptj, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc,
-           cluster, GSE_zh)
+    select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, centil_educ_pers, GSE_pers,
+           educ_mzn, educ_zona,  GSE_mzn, GSE_zona, 
+           ptje_ISMT, GSE_ISMT_pers, ISMT_mzn, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc, med_ISMT_zh,
+           cluster, GSE_ISMT_zh)
   
   #Guardar
   # mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo_mediana.Rds")
-  mzn_mont %>% saveRDS("Output/Data_Temuco_cluster_mediana_educ_4.Rds")
+  # mzn_mont %>% saveRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds")
+  mzn_mont %>% saveRDS("Output/Data_Nunoa_cluster_ismt_1.Rds")
 
 # }

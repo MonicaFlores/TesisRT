@@ -12,31 +12,19 @@ options(scipen=999)
 
 # setwd("C:/Users/cit1/Documents/Max_P")
 # setwd("//SVWIN022/00.cit/05.INVESTIGACION/2018_DELITO_BAC_SPD/Max_P_ej")
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 ####### Triangulation [Creacion de Vecinos]  #####
 
 # Leer datos - shape manzanas, ciudad -------------------------------------
 
-# # Leer shape manzanas ciudad
-# shape <- readOGR("Shapes",paste0("mzs_",city),stringsAsFactors=F)
-# shape <- readOGR("Input/mzn_temuco_clean_cont.shp", stringsAsFactors=F)
-# rownames(shape@data) = shape$id = 0:(nrow(shape@data)-1) # Generar variable índice
-# shape$IDMZ = as.character(shape$MANZENT) # Guardar ID Manzana como caracter
+# shape <- readOGR("Shapes/mzn_temuco_ismt_rand_filter.shp", stringsAsFactors=F)
+# shape <- readOGR("Shapes/mzn_temuco_filter.shp", stringsAsFactors=F)
+# shape <- readOGR("Shapes/mzn_stgo_ismt_nunoa.shp", stringsAsFactors=F)
+shape <- readOGR("Shapes/mzn_stgo_ismt.shp", stringsAsFactors=F)
 
-# # Guardar shape manzana (overwrite)
-# writeOGR(shape, "Shapes","mzn_temuco",driver="ESRI Shapefile", overwrite_layer=T)
-# 
-# test_ <- st_read("Shapes/mzn_temuco.shp") %>% 
-#   mutate(IDMZ = MANZENT,
-#          EDUC = scale(EDUC)) %>% 
-#   select(id, IDMZ, POB, EDUC)
-
-# # test_ <- st_read("Shapes/mzn_temuco.shp") %>% filter(POB >= 15) # Filtrar el decil de menor población
-# test_ %>% st_write("Shapes/mzn_temuco_filter.shp", quiet=TRUE, delete_layer=TRUE)
-
-shape <- readOGR("Shapes/mzn_temuco_filter.shp", stringsAsFactors=F)
 
 # Preparar datos - centroides ---------------------------------------------
 
@@ -102,5 +90,5 @@ plot.nb(vecs, coords) # Plotear
 
 # Guardar shapes ----------------------------------------------------------
 
-writeOGR(lineas,"Shapes","vecinos_filter",driver="ESRI Shapefile",overwrite_layer=T)
-write.nb.gal(vecs, "Output/weights_filter.gal", oldstyle=TRUE, shpfile=NULL, ind=NULL)
+writeOGR(lineas,"Shapes","vecinos_stgo_ismt",driver="ESRI Shapefile",overwrite_layer=T)
+write.nb.gal(vecs, "Output/weights_stgo_ismt.gal", oldstyle=TRUE, shpfile=NULL, ind=NULL)
