@@ -23,7 +23,7 @@ setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 # shape <- readOGR("Shapes/mzn_temuco_ismt_rand_filter.shp", stringsAsFactors=F)
 # shape <- readOGR("Shapes/mzn_temuco_filter.shp", stringsAsFactors=F)
 # shape <- readOGR("Shapes/mzn_stgo_ismt_nunoa.shp", stringsAsFactors=F)
-shape <- readOGR("Shapes/mzn_stgo_ismt.shp", stringsAsFactors=F)
+shape <- readOGR("Shapes/mzn_stgo_ismt_filter.shp", stringsAsFactors=F)
 
 
 # Preparar datos - centroides ---------------------------------------------
@@ -90,5 +90,5 @@ plot.nb(vecs, coords) # Plotear
 
 # Guardar shapes ----------------------------------------------------------
 
-writeOGR(lineas,"Shapes","vecinos_stgo_ismt",driver="ESRI Shapefile",overwrite_layer=T)
-write.nb.gal(vecs, "Output/weights_stgo_ismt.gal", oldstyle=TRUE, shpfile=NULL, ind=NULL)
+writeOGR(lineas,"Shapes","vecinos_stgo_ismt_filter",driver="ESRI Shapefile",overwrite_layer=T)
+write.nb.gal(vecs, "Output/weights_stgo_ismt_filter.gal", oldstyle=TRUE, shpfile=NULL, ind=NULL)

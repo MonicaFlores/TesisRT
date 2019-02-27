@@ -20,8 +20,8 @@ np.random.seed(100)
 
 #shp = gpd.read_file("/Users/MoniFlores/Desktop/Tesis RT/Data/Shapes/mzn_temuco.shp")
 #shp = gpd.read_file("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data/Shapes/mzn_temuco.shp")
-shp = gpd.read_file("Shapes/mzn_stgo_ismt_nunoa.shp")
-w = pysal.open("Output/weights_nunoa_ismt.gal").read()
+shp = gpd.read_file("Shapes/mzn_stgo_ismt_filter.shp")
+w = pysal.open("Output/weights_stgo_ismt_filter.gal").read()
 z = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values # eliminar todo menos EDUC (ISMT)
 p = shp.drop(['geometry', 'id','ISMT','IDMZ'], axis=1).values # eliminar todo menos POB
 #p = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values # eliminar todo menos POB
@@ -43,7 +43,7 @@ shpreg=shp.merge(lbdat,on='id') # No funcionó
 #shpreg=pd.merge(shp, lbdat,on='id', how='left')
 
 
-shpreg.to_file('Shapes/output_nunoa_1')
+shpreg.to_file('Shapes/output_stgo_1')
 
 
 
