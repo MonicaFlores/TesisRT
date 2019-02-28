@@ -82,6 +82,7 @@ shp_maxp <- shp_mz_vec %>%
   left_join(ismt_mzn, by = c("MANZENT"="manzent")) %>% 
   na.omit(POB) %>% 
   #filter(CUT == 13120) %>%  # Filtrar comuna = Nunoa
+  #filter(CUT == 13101) %>%  # Filtrar comuna = Santiago
   mutate(
     IDMZ = as.character(MANZENT),
     id = row_number(),
