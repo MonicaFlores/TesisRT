@@ -12,8 +12,8 @@ library(sf)
 library(tidyverse)
 
 # Directorio
-# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # leer base censal 
 # censo2012_R09 <- readRDS("Censo2012_R09.Rds") %>% filter(year == 2012 & region == 9)
@@ -49,7 +49,8 @@ ismt_mzn <- ismt %>%
   group_by(manzent) %>% 
   summarise(
     ISMT = median(ptje_ISMT, na.rm = TRUE)
-  ) %>% ungroup()
+  ) %>% 
+  ungroup()
 
 # # Persona random por manzana 
 # ismt_mzn <- ismt %>% 
@@ -94,7 +95,7 @@ shp_maxp <- shp_mz_vec %>%
 # Guardar shape
 shp_maxp %>% st_write("Shapes/mzn_stgo_ismt.shp", quiet = TRUE, delete_layer = TRUE)
 
-test <- st_read("Shapes/mzn_stgo_ismt.shp")
+# test <- st_read("Shapes/mzn_stgo_ismt.shp")
 
 
 # Data para montecarlo-----------------------------------------
@@ -266,12 +267,15 @@ mzn_mont <- c2012_clust %>%
     left_join(prom_zh, by = "cluster") %>% # Unir zonas homogeneas
     select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, centil_educ_pers, GSE_pers,
            educ_mzn, educ_zona,  GSE_mzn, GSE_zona, 
-           ptje_ISMT, GSE_ISMT_pers, ISMT_mzn, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc, med_ISMT_zh,
-           cluster, GSE_ISMT_zh)
+           ptje_ISMT, GSE_ISMT_pers, ISMT_mzn, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc, 
+           med_ISMT_zh, cluster, GSE_ISMT_zh
+           )
   
   #Guardar
   # mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo_mediana.Rds")
   # mzn_mont %>% saveRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds")
-  mzn_mont %>% saveRDS("Output/Data_Nunoa_cluster_ismt_1.Rds")
+  # mzn_mont %>% saveRDS("Output/Data_Nunoa_cluster_ismt_1.Rds")
+  mzn_mont %>% saveRDS("Output/Data_Stgo_ismt.Rds")
+  
 
 # }

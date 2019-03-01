@@ -10,11 +10,12 @@
 library(tidyverse)
 
 # Directorio
-# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # Leer datos
-data <- readRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds") 
+# data <- readRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds") 
+data <- readRDS("Output/Data_Stgo_ismt.Rds") 
 head(data)
 
 
@@ -39,9 +40,15 @@ data_gse <- data %>%
 #  D             23722  0.297 
 #  E              4846  0.0607 
   
+# # Santiago   
+# GSE_ISMT_pers pct_hog
+#    ABC1           0.209 
+#    C2             0.148 
+#    C3             0.283 
+#    D              0.300 
+#    E              0.0605
 
-
-# Seleccionar muestra aleatoria 384 ---------------------------------------
+# Muestreo aleatorio ---------------------------------------
 
 sample_size <- 384 # 384 para error .05 población entre 100.000 - 2.000.000 https://es.slideshare.net/DanielMorales63/tamao-muestra-15307553 p12
 
@@ -53,7 +60,7 @@ m_aleatorio <-  function(data) {
     group_by(GSE_ISMT_pers) %>% 
     summarise(
       n_hog_s = n(),
-      pct_hog_s = n_hog_s / sample_size
+      pct_hog_s = n_hog_s / sample_size 
     ) %>% 
     ungroup() %>% 
     left_join(data_gse, by = "GSE_ISMT_pers") %>% 
@@ -69,7 +76,7 @@ m_aleatorio <-  function(data) {
 result <- replicate(100, m_aleatorio(data))
 mean(result)
 # 0.08461054 - 0.07674775 error Temuco
-
+# 0.07829189 error Santiago
 
 # Seleccionar muestra estratificada por manzana ---------------------------------------
 
@@ -77,36 +84,53 @@ sample_estr <- 96 # 384/4 = 96 - tomando 4 personas por manzana
 sample_manz <- 4 # Personas por manzana
 
 m_estratif <-  function(data)   {
-  # Seleccionar 1 observación por manzana 
+  
+  # Seleccionar manzanas con menos de cuatro hogares
+  mzn_excl <- data %>% 
+    filter(!is.na(GSE_ISMT_mzn) & GSE_ISMT_mzn != "E") %>% # Filtrar obs sin GSE ISMT mzn o es E
+    group_by(manzent) %>% 
+    summarise(n = n()) %>% 
+    filter(n<4) %>% # en Santiago hay 46 manzanas con menos de 4 hogares
+    select(manzent)
+  
+  # Seleccionar manzanas aleatoriamente por GSE
   data_mzn <- data %>%  
-    filter(!is.na(GSE_ISMT_mzn) & GSE_ISMT_mzn != "E") %>% # Hay solo 3 manzanas E en Temuco
+    filter(!is.na(GSE_ISMT_mzn) & GSE_ISMT_mzn != "E") %>% # Hay solo 3 manzanas E en Temuco, 65 en Stgo
     # filter(!is.na(GSE_ISMT_mzn)) %>% 
+    anti_join(mzn_excl, by = "manzent") %>% # Excluir mzn con menos de 4 hogares
     select(manzent, GSE_ISMT_mzn) %>% 
+    # group_by(manzent) %>% summarise(n()) %>% 
     unique() %>% 
     group_by(GSE_ISMT_mzn) %>% 
+    # summarise(n()) %>% 
     sample_n(sample_estr) %>% 
     ungroup() %>% 
     select(manzent)
   
-  # # Manzanas E - Temuco  
-  # mzn_e <- data %>%  
-  #   filter(GSE_ISMT_mzn == "E")  %>% 
-  #   select(manzent) %>%
-  #   unique()
-  # 
-  # # Unir Manzanas E 
-  # data_mzn <- bind_rows(data_mzn, mzn_e)
+  # Manzanas E (todas tienen 4 o más hogares)
+  mzn_e <- data %>%
+    filter(GSE_ISMT_mzn == "E")  %>%
+    select(manzent) %>%
+    unique()
+
+  # Unir Manzanas E
+  data_mzn <- bind_rows(data_mzn, mzn_e)
   
+  # Calcular total muestra manzanas
+  tot_mzn <- data_mzn %>% summarise(n()) %>% as.numeric()
+  
+  # Seleccionar 4 hogares aleatoriamente por manzana
   sample_estrat <- data %>% 
     filter(!is.na(GSE_ISMT_pers)) %>%
     inner_join(data_mzn, by = "manzent") %>% 
     group_by(manzent) %>% 
+    # summarise(n()) %>% 
     sample_n(sample_manz) %>% 
     ungroup() %>% 
     group_by(GSE_ISMT_pers) %>% 
     summarise(
       n_hog_s = n(),
-      pct_hog_s = n_hog_s / (sample_size *5)
+      pct_hog_s = n_hog_s / (tot_mzn * sample_manz) # Total hogares por grupo sobre el total de obs
     ) %>% 
     ungroup() %>% 
     left_join(data_gse, by = "GSE_ISMT_pers") %>% 
@@ -121,10 +145,11 @@ m_estratif <-  function(data)   {
 result_estr <- replicate(100, m_estratif(data))
 mean(result_estr)
 # Temuco : 0.223 - 0.225
+# Santiago: 0.1979878 - 0.1941693
 
 
 # Muestreo espacializado por zona censal ----------------------------------
-# No es estratificado, al menos en Temuco, porque estoy usando todas las zonas censales
+# No es estratificado, al menos en Temuco, porque se usan las 86 zonas censales
 
 n_sample_zc <- 4 
 
@@ -170,8 +195,8 @@ m_zc <-  function(data)   {
 # Replicar 100 veces
 result_zc <- replicate(100, m_zc(data))
 mean(result_zc)
-# Temuco 0.07930511
-
+# Temuco ---- 0.07930511 - 86 zonas censales, 4 personas por zona 
+# Santiago -- 0.05152551 - 1539 zonas censales
 
 # Muestreo espacializado zonas homogeneas ---------------------------------
 
@@ -210,5 +235,6 @@ m_zh <-  function(data)   {
 result_zh <- replicate(100, m_zh(data))
 mean(result_zh)
 
-# Temuco 0.06726904!!
+# Temuco 
+# 0.06726904 con 4 personas por zona 
 # 0.09112519 con 2 persoanas - total 344 muestra
