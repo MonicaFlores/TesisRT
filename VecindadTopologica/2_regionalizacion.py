@@ -26,7 +26,7 @@ z = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values # eliminar todo men
 p = shp.drop(['geometry', 'id','ISMT','IDMZ'], axis=1).values # eliminar todo menos POB
 #p = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values # eliminar todo menos POB
 
-floor = 1000
+floor = 500
 solution = pysal.region.Maxp(w, z, floor, floor_variable=p, initial=100) 
 
 solution.p
