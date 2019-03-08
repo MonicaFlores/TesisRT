@@ -12,8 +12,8 @@ library(sf)
 library(tidyverse)
 
 # Directorio
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # leer base censal 
 # censo2012_R09 <- readRDS("Censo2012_R09.Rds") %>% filter(year == 2012 & region == 9)
@@ -78,12 +78,27 @@ shp_mz_vec <- shp_mz %>%
   left_join(R13_mzn_data, by = c("MANZENT" = "manzent")) %>% 
   mutate(MANZENT= as.character(MANZENT))
 
+###########################################################################
+
+# Iterar sobre cada comuna ------------------------------------------------
+
+# comunas <- shp_mz_vec %>% st_set_geometry(NULL) %>% select(CUT) %>% unique()
+# comunas <- comunas %>% unlist() %>%  set_names(NULL) 
+# 41 comunas, de las cuales queda nula 1 - San Jose de Maipo 13203
+
+comunas <- c(13101, 13102, 13103, 13104, 13105, 13106, 13107, 13108, 13109, 13110, 13111, 13112, 13113, 13114,
+            13115, 13116, 13117, 13118, 13119, 13120, 13121, 13123, 13124, 13125, 13126, 13127, 13128, 13130,
+            13131, 13132, 13201, 13203, 13301, 13302, 13401, 13403, 13601, 13604, 13605, 13122, 13129)
+
+# comunas <- c(13120, 13101) # Nunoa y Santiago
+
+for (comuna in comunas) {
+
 # Shape para max_p
 shp_maxp <- shp_mz_vec %>% 
   left_join(ismt_mzn, by = c("MANZENT"="manzent")) %>% 
   na.omit(POB) %>% 
-  #filter(CUT == 13120) %>%  # Filtrar comuna = Nunoa
-  #filter(CUT == 13101) %>%  # Filtrar comuna = Santiago
+  filter(CUT == comuna) %>%  
   mutate(
     IDMZ = as.character(MANZENT),
     id = row_number(),
@@ -93,10 +108,12 @@ shp_maxp <- shp_mz_vec %>%
   select(IDMZ, id, POB, ISMT) #EDUC) 
 
 # Guardar shape
-shp_maxp %>% st_write("Shapes/mzn_stgo_ismt.shp", quiet = TRUE, delete_layer = TRUE)
+shp_maxp %>% st_write(glue("Shapes/mzn_stgo_ismt_{comuna}.shp"), quiet = TRUE, delete_layer = TRUE)
 
-# test <- st_read("Shapes/mzn_stgo_ismt.shp")
+}
 
+test <- st_read("Shapes/mzn_stgo_ismt_13120.shp")
+test <- st_read("Shapes/mzn_stgo_ismt_13101.shp")
 
 # Data para montecarlo-----------------------------------------
 
@@ -192,13 +209,13 @@ quant_pob <- quantile(prom_zc$pob_zona, probs = seq(0, 1, 0.1), na.rm=TRUE) %>% 
 ############# Correr script python vecindarios max_p #################
 
 # Leer output script max_p
-z_homogeneas <- st_read("Shapes/output_nunoa_1") %>% 
+z_homogeneas <- st_read("Shapes/output_stgo_1") %>% 
   st_set_geometry(NULL) %>% 
   mutate(manzent = as.character(IDMZ)) %>% 
   select(manzent, cluster)
 
 # Comprobar n clusters = solution.p en script max_p
-test <- z_homogeneas %>% group_by(cluster) %>% summarise(n_obs = n())
+test <- z_homogeneas %>% group_by(cluster) %>% summarise(n_obs = n()) # 7.044 zonas, output maxp 7.058 
 
 # seleccionar ptje ismt por jefe de hogar
 ismt_join <- ismt %>% select(manzent, folio, nviv, nhogar, ptje_ISMT)
@@ -275,7 +292,7 @@ mzn_mont <- c2012_clust %>%
   # mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo_mediana.Rds")
   # mzn_mont %>% saveRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds")
   # mzn_mont %>% saveRDS("Output/Data_Nunoa_cluster_ismt_1.Rds")
-  mzn_mont %>% saveRDS("Output/Data_Stgo_ismt.Rds")
+  mzn_mont %>% saveRDS("Output/Data_Stgo_cluster_ismt_1.Rds")
   
 
 # }

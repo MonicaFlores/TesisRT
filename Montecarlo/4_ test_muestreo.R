@@ -10,12 +10,13 @@
 library(tidyverse)
 
 # Directorio
-setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
-# setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+# setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
+setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # Leer datos
-# data <- readRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds") 
-data <- readRDS("Output/Data_Stgo_ismt.Rds") 
+data <- readRDS("Output/Data_Stgo_cluster_ismt_1.Rds")
+# data <- readRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds")
+# data <- readRDS("Output/Data_Stgo_ismt.Rds") 
 head(data)
 
 
@@ -78,6 +79,48 @@ mean(result)
 # 0.08461054 - 0.07674775 error Temuco
 # 0.07829189 error Santiago
 
+
+# Muestreo aleatorio por manzana ------------------------------------------
+
+sample_al <- 96 # 384/4 
+sample_mz <- 4
+
+m_aleatorio_mzn <-  function(data) {
+  
+  sample_mzn <- data %>% 
+    filter(!is.na(GSE_ISMT_pers)) %>% 
+    group_by(manzent) %>% 
+    summarise(n = n()) %>% 
+    filter(n>=4) %>% # Filtro manzanas con más de 4 personas
+    select(manzent) %>% 
+    sample_n(sample_al) # Selección muestra 96 manzanas
+  
+  sample_data <- data %>%
+    filter(!is.na(GSE_ISMT_pers)) %>%
+    inner_join(sample_mzn, by = "manzent") %>% 
+    group_by(manzent) %>% 
+    sample_n(sample_mz) %>% 
+    ungroup() %>% 
+    group_by(GSE_ISMT_pers) %>% 
+    summarise(
+      n_hog_s = n(),
+      pct_hog_s = n_hog_s/384 
+    ) %>% 
+    left_join(data_gse, by = "GSE_ISMT_pers") %>% 
+    mutate(
+      pct_error =  abs(pct_hog - pct_hog_s)
+    )
+  
+  sample_data %>% summarise(error = sum(pct_error)) %>% as.numeric()
+  
+}
+
+# Replicar 100 veces
+result <- replicate(100, m_aleatorio_mzn(data))
+mean(result)
+# 0.1777729 Santiago
+# 0.1046598 Temuco
+
 # Seleccionar muestra estratificada por manzana ---------------------------------------
 
 sample_estr <- 96 # 384/4 = 96 - tomando 4 personas por manzana
@@ -96,13 +139,10 @@ m_estratif <-  function(data)   {
   # Seleccionar manzanas aleatoriamente por GSE
   data_mzn <- data %>%  
     filter(!is.na(GSE_ISMT_mzn) & GSE_ISMT_mzn != "E") %>% # Hay solo 3 manzanas E en Temuco, 65 en Stgo
-    # filter(!is.na(GSE_ISMT_mzn)) %>% 
     anti_join(mzn_excl, by = "manzent") %>% # Excluir mzn con menos de 4 hogares
     select(manzent, GSE_ISMT_mzn) %>% 
-    # group_by(manzent) %>% summarise(n()) %>% 
     unique() %>% 
     group_by(GSE_ISMT_mzn) %>% 
-    # summarise(n()) %>% 
     sample_n(sample_estr) %>% 
     ungroup() %>% 
     select(manzent)
@@ -144,31 +184,51 @@ m_estratif <-  function(data)   {
 # Replicar 100 veces
 result_estr <- replicate(100, m_estratif(data))
 mean(result_estr)
-# Temuco : 0.223 - 0.225
+# Temuco : 0.1853136 - 0.1881098
 # Santiago: 0.1979878 - 0.1941693
 
 
 # Muestreo espacializado por zona censal ----------------------------------
 # No es estratificado, al menos en Temuco, porque se usan las 86 zonas censales
 
-n_sample_zc <- 4 
+# Seleccionar una muestra similar a las distribución por zona homogenea
+n_abc1 <- 80
+n_c2 <- 57
+n_c3 <- 109
+n_d <- 115
+n_e <- 23
 
 m_zc <-  function(data)   {
-  # Seleccionar 1 observación por zona censal 
-  # data_zc <- data %>%
-  #   filter(!is.na(GSE_ISMT_zc)) %>%
-  #   select(geocode, GSE_ISMT_zc) %>%
-  #   unique() %>%
-  #   group_by(GSE_ISMT_zc) %>%
-  #   # summarise(n())
-  #   sample_n(sample_estr) %>% 
-  #   ungroup() %>% 
-  #   select(geocode)
+
+    # Temuco tiene 86 zonas Censales, usar todas
+  # data_zc <- data %>% 
+  #     select(geocode) %>%
+  #     unique()
   
-  # Temuco tiene 86 zonas Censales, usar todas
   data_zc <- data %>% 
-      select(geocode) %>%
-      unique()
+    filter(!is.na(GSE_ISMT_zc) & !is.na(GSE_ISMT_pers)) %>% 
+    select(geocode, GSE_ISMT_zc, ISMTptj_zc) %>%
+    unique() %>% 
+    # Construir GSE E con el 6% más bajo
+    mutate(
+      rank = percent_rank(ISMTptj_zc),
+      GSE_proxy = case_when(
+        rank < 0.06 ~ "E",
+        rank >= 0.06 & GSE_ISMT_zc == "D" ~ "D",
+        # rank >= 0.06 & rank < 0.36 ~ "D",
+        # rank >= 0.36 & rank < 0.64 ~ "C3",
+        # rank >= 0.64 & rank < 0.79 ~ "C2",
+        # rank >= 0.79 ~ "ABC1",
+        TRUE ~ NA_character_)
+    )
+  
+  data_abc1 <- data_zc %>% filter(GSE_ISMT_zc == "ABC1") %>% sample_n(n_abc1)
+  data_c2 <- data_zc %>% filter(GSE_ISMT_zc == "C2") %>% sample_n(n_c2)
+  data_c3 <- data_zc %>% filter(GSE_ISMT_zc == "C3") %>% sample_n(n_c3)
+  data_d <- data_zc %>% filter(GSE_proxy == "D") %>% sample_n(n_d)
+  data_e <- data_zc %>% filter(GSE_proxy == "E") %>% sample_n(n_e)
+  
+  data_zc <- rbind(data_abc1, data_c2, data_c3, data_d, data_e) %>% select(geocode)
   
   n_zc <- data_zc %>% summarise(n()) %>% as.numeric
   
@@ -176,12 +236,12 @@ m_zc <-  function(data)   {
     filter(!is.na(GSE_ISMT_pers)) %>%
     inner_join(data_zc, by = "geocode") %>% 
     group_by(geocode) %>% 
-    sample_n(n_sample_zc) %>% 
+    sample_n(1) %>% 
     ungroup() %>% 
     group_by(GSE_ISMT_pers) %>% 
     summarise(
       n_hog_s = n(),
-      pct_hog_s = n_hog_s / (n_zc * n_sample_zc)
+      pct_hog_s = n_hog_s/n_zc
     ) %>% 
     ungroup() %>% 
     left_join(data_gse, by = "GSE_ISMT_pers") %>% 
@@ -196,30 +256,56 @@ m_zc <-  function(data)   {
 result_zc <- replicate(100, m_zc(data))
 mean(result_zc)
 # Temuco ---- 0.07930511 - 86 zonas censales, 4 personas por zona 
-# Santiago -- 0.05152551 - 1539 zonas censales
+# Santiago -- 0.05152551 - 1539 zonas censales 1 persona por zona censal
+# Santiago - 0.08313031 - 0.08908066
 
 # Muestreo espacializado zonas homogeneas ---------------------------------
 
-n_sample_zh <- 2
+# Seleccionar una muestra similar a las distribución por zona homogenea
+n_abc1 <- 80
+n_c2 <- 57
+n_c3 <- 109
+n_d <- 115
+n_e <- 23
 
 m_zh <-  function(data)   {
   
   data_zh <- data %>% 
-    select(cluster) %>%
-    unique()
+    select(cluster, GSE_ISMT_zh, med_ISMT_zh) %>%
+    unique() %>% 
+    # Construir GSE E con el 6% más bajo
+    mutate(
+      rank = percent_rank(med_ISMT_zh),
+      GSE_proxy = case_when(
+        rank < 0.06 ~ "E", 
+        rank >= 0.06 & GSE_ISMT_zh == "D" ~ "D",
+        # rank >= 0.06 & rank < 0.36 ~ "D",
+        # rank >= 0.36 & rank < 0.64 ~ "C3",
+        # rank >= 0.64 & rank < 0.79 ~ "C2",
+        # rank >= 0.79 ~ "ABC1",
+        TRUE ~ NA_character_)
+    ) 
+
+  data_abc1 <- data_zh %>% filter(GSE_ISMT_zh == "ABC1") %>% sample_n(n_abc1)
+  data_c2 <- data_zh %>% filter(GSE_ISMT_zh == "C2") %>% sample_n(n_c2)
+  data_c3 <- data_zh %>% filter(GSE_ISMT_zh == "C3") %>% sample_n(n_c3)
+  data_d <- data_zh %>% filter(GSE_proxy == "D") %>% sample_n(n_d)
+  data_e <- data_zh %>% filter(GSE_proxy == "E") %>% sample_n(n_e)
+  
+  data_zh <- rbind(data_abc1, data_c2, data_c3, data_d, data_e) %>% select(cluster)
   
   n_zh <- data_zh %>% summarise(n()) %>% as.numeric
   
   sample_zh <- data %>% 
     filter(!is.na(GSE_ISMT_pers)) %>%
     inner_join(data_zh, by = "cluster") %>% 
-    group_by(cluster) %>% 
-    sample_n(n_sample_zh) %>% 
-    ungroup() %>% 
+    group_by(cluster) %>%
+    sample_n(1) %>%
+    ungroup() %>%
     group_by(GSE_ISMT_pers) %>% 
     summarise(
       n_hog_s = n(),
-      pct_hog_s = n_hog_s / (n_zh * n_sample_zh)
+      pct_hog_s = n_hog_s/n_zh
     ) %>% 
     ungroup() %>% 
     left_join(data_gse, by = "GSE_ISMT_pers") %>% 
@@ -237,4 +323,8 @@ mean(result_zh)
 
 # Temuco 
 # 0.06726904 con 4 personas por zona 
-# 0.09112519 con 2 persoanas - total 344 muestra
+# 0.08768771 - 0.09112519 con 2 persoanas - total 344 muestra
+
+# Santiago
+# 0.0938711 seleccion aleatoria por GSE zona homogenea con distribución parecida a la de la población
+# 0.130898 Solo con proxy GSE 
