@@ -39,6 +39,16 @@ for comuna in comunas:
     shp = gpd.read_file("Shapes/mzn_stgo_ismt_" + str(comuna) + ".shp")
     #w = pysal.open("Output/weights_stgo_ismt_" + str(comuna) + ".gal").read()
     w = pysal.open("Output/weights_stgo_ismt_nunoa_test5.gal").read()
+    w.
+    # Prueba
+    neighbors = {0: [3, 1], 1: [0, 4, 2], 2: [1, 5], 3: [0, 6, 4], 4: [1, 3, 7, 5], 5: [2, 4, 8], 6: [3, 7], 7: [4, 6, 8], 8: [5, 7]}
+    test = pysal.weights.W(neighbors)
+    test.neighbors
+    test.weights
+
+    #Convertir strings to integers en w
+    dict((k, int(v)) for k, v in w.neighbors.items())
+    
     z = shp.drop(['geometry', 'id','POB','IDMZ'], axis=1).values # eliminar todo menos EDUC (ISMT)
     p = shp.drop(['geometry', 'id','ISMT','IDMZ'], axis=1).values # eliminar todo menos POB
     #p = shp.drop(['geometry', 'id','EDUC','IDMZ'], axis=1).values # eliminar todo menos POB

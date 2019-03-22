@@ -19,12 +19,12 @@ setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 ####### Triangulation [Creacion de Vecinos]  #####
 
-comunas <- c(13101, 13102, 13103, 13104, 13105, 13106, 13107, 13108, 13109, 13110, 13111, 13112, 13113, 13114,
-             13115, 13116, 13117, 13118, 13119, 13120, 13121, 13123, 13124, 13125, 13126, 13127, 13128, 13130,
-             13131, 13132, 13201, #13203, San José de Maipo falla - solo tiene 3 manzanas con POB válida dentro del AUC
-             13301, 13302, 13401, 13403, 13601, 13604, 13605, 13122, 13129)
+# comunas <- c(13101, 13102, 13103, 13104, 13105, 13106, 13107, 13108, 13109, 13110, 13111, 13112, 13113, 13114,
+#              13115, 13116, 13117, 13118, 13119, 13120, 13121, 13123, 13124, 13125, 13126, 13127, 13128, 13130,
+#              13131, 13132, 13201, #13203, San José de Maipo falla - solo tiene 3 manzanas con POB válida dentro del AUC
+#              13301, 13302, 13401, 13403, 13601, 13604, 13605, 13122, 13129)
 
-# comunas <- c(13120, 13101) # Test Nunoa y Santiago
+comunas <- c(13120, 13101) # Test Nunoa y Santiago
 
 for (comuna in comunas) {
 
@@ -113,6 +113,7 @@ for (obs in 1:length(vecs1)) {
 }
 
 plot(vecs,coords) # Plotear triangulación final
+plot(vecs1,coords) # Plotear triangulación final
 
 # Traspasar vecindad a líneas
 #lw <- nb2listw(vecs) # Spatial Weights For Neighbours Lists
@@ -126,6 +127,7 @@ lineas <- listw2lines(lw, coords, proj4string = CRS(proj4string(ciudad))) # Use 
 # writeOGR(lineas,"Shapes", glue("vecinos_stgo_ismt_{comuna}"),driver="ESRI Shapefile",overwrite_layer=T)
 writeOGR(lineas,"Shapes", glue("vecinos_stgo_ismt_nunoa_test4"),driver="ESRI Shapefile",overwrite_layer=T)
 # write.nb.gal(vecs, glue("Output/weights_stgo_ismt_{comuna}.gal"), oldstyle=TRUE, shpfile=NULL, ind=NULL)
+write.nb.gal(vecs, glue("Output/weights_stgo_ismt_nunoa_test5.gal"), oldstyle=TRUE, shpfile=NULL, ind=NULL)
 write.nb.gal(vecs, glue("Output/weights_stgo_ismt_nunoa_test5.gal"), oldstyle=TRUE, shpfile=NULL, ind=NULL)
 
 }

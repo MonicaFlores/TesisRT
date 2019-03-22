@@ -8,13 +8,17 @@
 # Notas:
 
 library(tidyverse)
+library(glue)
 
 # Directorio
 # setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
 setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
+# Definir floor
+floor <- 1500 
+
 # Leer datos
-data <- readRDS("Output/Data_Stgo_cluster_ismt_1.Rds")
+data <- readRDS(glue("Output/Maxp_Stgo_cluster_f{floor}.Rds"))
 # data <- readRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds")
 # data <- readRDS("Output/Data_Stgo_ismt.Rds") 
 head(data)
@@ -24,6 +28,7 @@ head(data)
 
 tot_hog <- data %>% filter(!is.na(GSE_ISMT_pers)) %>% summarise(n()) %>% as.numeric()
 
+# Distribucion por GSE
 data_gse <- data %>% 
   filter(!is.na(GSE_ISMT_pers)) %>% 
   group_by(GSE_ISMT_pers) %>% 
@@ -32,6 +37,9 @@ data_gse <- data %>%
     pct_hog = n_hog / tot_hog
   ) %>% 
   select(-n_hog)
+
+# Promedio ISMT persona
+prom_ismt_pers <- data$ISMT_pers %>% mean(na.rm = TRUE)
 
 # Temuco
 # GSE_ISMT_pers n_hog pct_hog
@@ -80,7 +88,7 @@ mean(result)
 # 0.07829189 error Santiago
 
 
-# Muestreo aleatorio por manzana ------------------------------------------
+# Muestreo aleatorio POR manzana ------------------------------------------
 
 sample_al <- 96 # 384/4 
 sample_mz <- 4
@@ -199,17 +207,12 @@ n_d <- 115
 n_e <- 23
 
 m_zc <-  function(data)   {
-
-    # Temuco tiene 86 zonas Censales, usar todas
-  # data_zc <- data %>% 
-  #     select(geocode) %>%
-  #     unique()
   
+  # Construir GSE E con el 6% más bajo
   data_zc <- data %>% 
     filter(!is.na(GSE_ISMT_zc) & !is.na(GSE_ISMT_pers)) %>% 
     select(geocode, GSE_ISMT_zc, ISMTptj_zc) %>%
     unique() %>% 
-    # Construir GSE E con el 6% más bajo
     mutate(
       rank = percent_rank(ISMTptj_zc),
       GSE_proxy = case_when(

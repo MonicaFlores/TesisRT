@@ -27,14 +27,14 @@ shp_mz <- st_read("Input/mzn_AUC_stgo.shp") %>%
     geocode = (CUT*1000000) + (DISTRITO*10000) + (1*1000) + (ZONA)  # Crear codigo zona
   )
 
-#Leer shape zonas y arreglar geocode
-# shp_zc <- st_read("Input/zona_AUC_stgo2012.shp") %>%
+# #Leer shape zonas y arreglar geocode
+# shp_zc <- st_read("Input/zona_stgo2012.shp") %>%
 #   mutate(
-#     geocode = (CUT*1000000) + (DISTRITO*10000) + (1*1000) + (ZONA) # Crear codigo zona
+#     geocode = (CUT*1000000) + (COD_DISTRI*10000) + (1*1000) + (COD_ZONA) # Crear codigo zona
 #   )
 # 
 # # Guardar shape zona
-# shp_zc %>% st_write("Input/zona_AUC_stgo2012_clean.shp", quiet = TRUE, delete_layer = TRUE)
+# shp_zc %>% st_write("Input/zona_stgo2012_clean.shp", quiet = TRUE, delete_layer = TRUE)
 
 # Leer archivo GSE ISMT -------------------------------------------------------
 
@@ -90,7 +90,7 @@ comunas <- c(13101, 13102, 13103, 13104, 13105, 13106, 13107, 13108, 13109, 1311
             13115, 13116, 13117, 13118, 13119, 13120, 13121, 13123, 13124, 13125, 13126, 13127, 13128, 13130,
             13131, 13132, 13201, 13203, 13301, 13302, 13401, 13403, 13601, 13604, 13605, 13122, 13129)
 
-# comunas <- c(13120, 13101) # Nunoa y Santiago
+# comunas <- c(13120, 13101) # Test Nunoa y Santiago
 
 for (comuna in comunas) {
 
@@ -190,7 +190,7 @@ prom_zc %>%
 # n_zonas   min   max  prom median
 #      88   187  6183 2997.  2790.
 
-# Santiago
+# Gran Santiago
 # n_zonas   min   max  prom median
 #   1539    16  10290 3635.   3542
 
@@ -206,16 +206,44 @@ quant_pob <- quantile(prom_zc$pob_zona, probs = seq(0, 1, 0.1), na.rm=TRUE) %>% 
 
 # Calculo GSE max_p -------------------------------------------------------
 
+
 ############# Correr script python vecindarios max_p #################
 
-# Leer output script max_p
-z_homogeneas <- st_read("Shapes/output_stgo_1") %>% 
-  st_set_geometry(NULL) %>% 
-  mutate(manzent = as.character(IDMZ)) %>% 
-  select(manzent, cluster)
+comunas <- c(13101, 13103, 13104, 13105, 13106, 13107, 13108, 13109, 13110, 13111, 13112, 13113, 13114,
+             13115, 13116, 13117, 13118, 13119, 13120, 13121, 13123, 13124, 13125, 13126, 13127, 13128, 13130,
+             13131, 13132, 13301, 13302, 13401, 13601, 13605, 13129
+             # 13203, queda fuera en delaunay
+             # 13102, 13201, 13403, 13122, quedan fuera en f1500
+             # 13604 queda fuera en floor 2500 
+             )
+
+floor <- 2500 # Definir floor 
+
+# # Leer output script max_p - unir todas las comunas de stgo
+z_homogeneas <- data.frame()
+
+for(comuna in comunas){ 
+  
+  ReadInMerge <- st_read(glue("Shapes/output_f{floor}_{comuna}")) %>% 
+    st_set_geometry(NULL) %>% 
+    transmute(
+      manzent = as.character(IDMZ),
+      cluster = str_c(comuna, cluster)
+    )
+  
+  z_homogeneas <- bind_rows(z_homogeneas, ReadInMerge)
+}
+
+
+# z_homogeneas <- st_read("Shapes/output_stgo_1") %>% 
+#   st_set_geometry(NULL) %>% 
+#   mutate(manzent = as.character(IDMZ)) %>% 
+#   select(manzent, cluster)
 
 # Comprobar n clusters = solution.p en script max_p
 test <- z_homogeneas %>% group_by(cluster) %>% summarise(n_obs = n()) # 7.044 zonas, output maxp 7.058 
+# floor 1500 - 2140 zonas homogeneas
+# floor 2000 - 1612 zonas homogeneas
 
 # seleccionar ptje ismt por jefe de hogar
 ismt_join <- ismt %>% select(manzent, folio, nviv, nhogar, ptje_ISMT)
@@ -269,22 +297,23 @@ prom_zh <- c2012_clust %>%
 mzn_mont <- c2012_clust %>% 
     filter(parentesco==1 & !is.na(cluster)) %>% #filtrar sólo jefes de hogar y NAs zonas homogeneas 
     mutate(
-      GSE_pers = case_when(
-        escolaridad <= E ~ "E",
-        escolaridad > E & escolaridad <= D ~ "D",
-        escolaridad > D & escolaridad <= C3 ~ "C3",
-        escolaridad > C3 & escolaridad  <= C2 ~ "C2",
-        escolaridad > C2 ~ "ABC1"
-      ),
-      centil_educ_pers = percent_rank(escolaridad)
+      # GSE_pers = case_when(
+      #   escolaridad <= E ~ "E",
+      #   escolaridad > E & escolaridad <= D ~ "D",
+      #   escolaridad > D & escolaridad <= C3 ~ "C3",
+      #   escolaridad > C3 & escolaridad  <= C2 ~ "C2",
+      #   escolaridad > C2 ~ "ABC1"
+      # ),
+      # centil_educ_pers = percent_rank(escolaridad)
+      ISMT_pers = ptje_ISMT
     ) %>%
     left_join(prom_mzn, by = "manzent") %>% # Unir manzana
     left_join(prom_zc, by = "geocode") %>% # Unir zona censal
     left_join(ismt, by = c("manzent", "folio", "nviv", "nhogar", "ptje_ISMT")) %>% # Unir GSE ISMT manzana y zona censal
     left_join(prom_zh, by = "cluster") %>% # Unir zonas homogeneas
-    select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, centil_educ_pers, GSE_pers,
+    select(region, geocode, manzent, nviv, nhogar, personan, parentesco, escolaridad, #centil_educ_pers, GSE_pers,
            educ_mzn, educ_zona,  GSE_mzn, GSE_zona, 
-           ptje_ISMT, GSE_ISMT_pers, ISMT_mzn, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc, 
+           ISMT_pers, GSE_ISMT_pers, ISMT_mzn, GSE_ISMT_mzn, ISMTptj_zc, GSE_ISMT_zc, 
            med_ISMT_zh, cluster, GSE_ISMT_zh
            )
   
@@ -292,7 +321,7 @@ mzn_mont <- c2012_clust %>%
   # mzn_mont %>% saveRDS("Output/Data_Temuco_Montecarlo_mediana.Rds")
   # mzn_mont %>% saveRDS("Output/Data_Temuco_cluster_mediana_ismt_8.Rds")
   # mzn_mont %>% saveRDS("Output/Data_Nunoa_cluster_ismt_1.Rds")
-  mzn_mont %>% saveRDS("Output/Data_Stgo_cluster_ismt_1.Rds")
+  mzn_mont %>% saveRDS(glue("Output/Maxp_Stgo_cluster_f{floor}.Rds"))
   
 
-# }
+
