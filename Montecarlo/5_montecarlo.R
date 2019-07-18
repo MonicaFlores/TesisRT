@@ -11,20 +11,23 @@
 library(tidyverse)
 library(glue)
 
+
+# Definiciones iniciales --------------------------------------------------
+
+
 # Directorio
 # setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
 setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
 
 # Definir floor
 floor <- 10000 
+
 # Leer datos
 data <- readRDS(glue("Output/Geoda_Stgo_cluster_{floor}.Rds"))
 head(data)
 
-# Distribución total ------------------------------------------------------
-
-# Promedio ISMT persona
-prom_ismt_pers <- data$ISMT_pers %>% mean(na.rm = TRUE)
+### Distribución total ###
+prom_ismt_pers <- data$ISMT_pers %>% mean(na.rm = TRUE) # Promedio ISMT persona
 
 # Seleccionar una muestra similar a las distribución por zona homogenea
 n_abc1 <- 0.209
@@ -33,11 +36,38 @@ n_c3 <- 0.283
 n_d <- 0.300
 n_e <- 0.0605
 
+
+# 1. DEFINICIÓN TAMAÑOS MUESTRALES ----------------------------------------
+
+
+#### Definir distintos tamaños de muestra para gráfico final
+#### Luego el for loop itera por cada tamaño muestral
+#### 
+
+# Muestreo aleatorio POR manzana
+sample_al <- c(1, 10, 20, 30, 50, 100, 300, 500, 625, 750) # Tomando 4 personas por manzana
+# Muestreo estratificado SIMPLE
+sample_size <- c(1, 2, 5, 10, 20, 30, 50, 100, 150, 200) # Muestra mas chica - tomando 4 personas por manzana, por GSE
+# Muestreo espacializado por zona censal 
+sample_zc <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por zona censal
+# Muestreo espacializado por distrito censal 
+sample_dc <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por distrito censal
+# Muestreo espacializado por barrios
+sample_br <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por barrio
+# Muestreo espacializado por ZONA HOMOGENEA
+sample_zh <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por zona homogenea
+
+
+
+# 2. DEFINICION FUNCIONES MUESTREO -------------------------------------------
+
+### CADA FUNCIÓN AQUÍ DEFINIDA TOMA UNA MUESTRA Y LUEGO CALCULA EL ERROR 
+### EL ERROR SE CALCULA SACANDO EL PROMEDIO ISMT DE LA MUESTRA Y LUEGO LA 
+### DIFERENCIA PORCENTUAL CON CON EL PROMEDIO TOTAL ISMT 
+
 # Muestreo aleatorio POR manzana ------------------------------------------
 
-# sample_al <- 96 # 384/4 
-sample_al <- c(1, 10, 20, 30, 50, 100, 300, 500, 625, 750)
-sample_mz <- 4
+# Función para sacar % error dada una muestra aleatoria de manzanas tomando 4 personas por manzana
 
 montecarlo_al <-  function(data) {
   
@@ -53,7 +83,7 @@ montecarlo_al <-  function(data) {
     filter(!is.na(GSE_ISMT_pers)) %>%
     inner_join(sample_mzn, by = "manzent") %>% 
     group_by(manzent) %>% 
-    sample_n(sample_mz) %>% # 4
+    sample_n(4) %>% # 4 PERSONAS POR MANZANA
     ungroup() %>% 
     summarise(
       mean_ISMT = mean(ISMT_pers, na.rm=TRUE)
@@ -69,9 +99,6 @@ montecarlo_al <-  function(data) {
 
 # Muestreo estratificado --------------------------------------------------
 
-# sample_estr <- seq(1, 750, 10) # Muestra mas chica - tomando 4 personas por manzana
-sample_size <- c(1, 2, 5, 10, 20, 30, 50, 100, 150, 200) # Muestra mas chica - tomando 4 personas por manzana, por grupo
-sample_manz <- 4 # Personas por manzana
 
 # Función para sacar % error dado una muestra estratificada
 m_estratif <-  function(data)   {
@@ -84,7 +111,7 @@ m_estratif <-  function(data)   {
     filter(n_<4) %>% # en Santiago hay 46 manzanas con menos de 4 hogares
     select(manzent)
   
-  # Seleccionar manzanas aleatoriamente por GSE
+  # Seleccionar manzanas aleatoriamente por GSE (excepto GSE E)
   data_mzn <- data %>%  
     filter(!is.na(GSE_ISMT_mzn) & GSE_ISMT_mzn != "E") %>% # Hay solo 3 manzanas E en Temuco, 65 en Stgo
     anti_join(mzn_excl, by = "manzent") %>% # Excluir mzn con menos de 4 hogares
@@ -95,14 +122,14 @@ m_estratif <-  function(data)   {
     ungroup() %>% 
     select(manzent)
 
-  # Manzanas E (todas tienen 4 o más hogares)
+  # Manzanas E 
   mzn_e <- data %>%
     filter(GSE_ISMT_mzn == "E")  %>%
     select(manzent) %>%
     unique() %>% 
-    sample_n(if_else(n<55, n, 55)) # Hay solo 55 manzanas E. Sample aleatorio para n menor a 50.
+    sample_n(if_else(n<55, n, 55)) # Hay solo 55 manzanas E. Tomar muestra con n menor a 55.
   
-  # Unir Manzanas E
+  # Unir Manzanas E a muestreo total
   data_mzn <- bind_rows(data_mzn, mzn_e)
   
   # Seleccionar 4 hogares aleatoriamente por manzana
@@ -110,7 +137,7 @@ m_estratif <-  function(data)   {
     filter(!is.na(GSE_ISMT_pers)) %>%
     inner_join(data_mzn, by = "manzent") %>% 
     group_by(manzent) %>% 
-    sample_n(sample_manz) %>% # 4
+    sample_n(4) %>% # 4 PERSONAS POR MANZANA
     ungroup() %>% 
     summarise(
       mean_ISMT = mean(ISMT_pers, na.rm=TRUE)
@@ -120,16 +147,14 @@ m_estratif <-  function(data)   {
     )
 
   # Output: error
-    sample_estrat$pct_error
+  sample_estrat$pct_error
 }
 
 # Muestreo espacializado por zona censal ----------------------------------
 
-sample_zc <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por zona censal
-
 m_zc <-  function(data)   {
   
-  # Construir GSE E con el 6% más bajo - da 81 E
+  # Construir GSE E con el 6% más bajo (No hay zonas censales E) - da 81 zonas E 
   data_zc <- data %>% 
     filter(!is.na(GSE_ISMT_zc) & !is.na(GSE_ISMT_pers)) %>% 
     select(geocode, GSE_ISMT_zc, ISMTptj_zc) %>%
@@ -142,14 +167,17 @@ m_zc <-  function(data)   {
         TRUE ~ NA_character_)
     )
   
+  # Tomar una muestra aleatoria de ZC según GSE, sin exceder el máximo de zonas censales de cada GSE
   data_abc1 <- data_zc %>% filter(GSE_ISMT_zc == "ABC1") %>% sample_n(if_else(n_abc1*n<233, as.integer(n_abc1*n), 233L)) 
   data_c2 <- data_zc %>% filter(GSE_ISMT_zc == "C2") %>% sample_n(if_else(n_c2*n<144, as.integer(n_c2*n), 144L)) 
   data_c3 <- data_zc %>% filter(GSE_ISMT_zc == "C3") %>% sample_n(if_else(n_c3*n<460, as.integer(n_c3*n), 460L)) 
   data_d <- data_zc %>% filter(GSE_proxy == "D") %>% sample_n(if_else(n_d*n<420, as.integer(n_d*n), 420L)) 
   data_e <- data_zc %>% filter(GSE_proxy == "E") %>% sample_n(if_else(n_e*n<81, as.integer(n_e*n), 81L)) 
   
+  # Unir muestra grupal
   data_zc <- rbind(data_abc1, data_c2, data_c3, data_d, data_e) %>% select(geocode)
   
+  # Calculo del número efectivo de zonas censales muestreadas
   n_zc <- data_zc %>% summarise(n()) %>% as.numeric()
   
   sample_zc <- data %>% 
@@ -171,34 +199,35 @@ m_zc <-  function(data)   {
 
 # Muestreo espacializado por distrito ----------------------------------
 
-sample_dc <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por zona censal
-
 m_dc <-  function(data)   {
   
-  # Construir GSE E con el 6% más bajo - da 81 E
+  # Construir GSE E con el 6% más bajo (No hay distritos E) 
   data_dc <- data %>% 
     filter(!is.na(GSE_dc) & !is.na(GSE_ISMT_pers)) %>% 
     select(comuna, distrito, GSE_dc, ISMT_dc) %>%
     unique() %>% 
-    # group_by(GSE_dc) %>% summarise(n())
     mutate(
       rank = percent_rank(ISMT_dc),
       GSE_proxy = case_when(
         rank < 0.06 | GSE_dc == "E" ~ "E",
         rank >= 0.06 & GSE_dc == "D" ~ "D",
         TRUE ~ NA_character_)
-    )  # %>% group_by(GSE_proxy) %>% summarise(n())
+    )  
   
+  # Tomar una muestra aleatoria de distritos según GSE, sin exceder el máximo de distritos de cada GSE
   data_abc1 <- data_dc %>% filter(GSE_dc == "ABC1") %>% sample_n(if_else(n_abc1*n<37, as.integer(n_abc1*n), 37L)) 
   data_c2 <- data_dc %>% filter(GSE_dc == "C2") %>% sample_n(if_else(n_c2*n<30, as.integer(n_c2*n), 30L)) 
   data_c3 <- data_dc %>% filter(GSE_dc == "C3") %>% sample_n(if_else(n_c3*n<116, as.integer(n_c3*n), 116L)) 
   data_d <- data_dc %>% filter(GSE_proxy == "D") %>% sample_n(if_else(n_d*n<94, as.integer(n_d*n), 94L)) 
   data_e <- data_dc %>% filter(GSE_proxy == "E") %>% sample_n(if_else(n_e*n<19, as.integer(n_e*n), 19L)) 
   
+  # Unir muestra GSE
   data_dc <- rbind(data_abc1, data_c2, data_c3, data_d, data_e) %>% select(comuna, distrito)
   
+  # Tamaño muestra efectiva
   n_dc <- data_dc %>% summarise(n()) %>% as.numeric()
   
+  # Cálculo error
   sample_dc <- data %>% 
     filter(!is.na(GSE_ISMT_pers)) %>%
     inner_join(data_dc, by = c("comuna", "distrito")) %>% 
@@ -218,7 +247,6 @@ m_dc <-  function(data)   {
 
 # Muestreo espacializado por barrio ----------------------------------
 
-sample_br <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por zona censal
 
 m_br <-  function(data)   {
   
@@ -265,15 +293,6 @@ m_br <-  function(data)   {
 
 # Muestreo espacializado zonas homogeneas ---------------------------------
 
-sample_zh <- c(1, 10, 50, 100, 500, 1000, 1500, 2000) # Muestra tomando 4 personas por zona homogenea
-
-# Seleccionar una muestra similar a las distribución por zona homogenea
-n_abc1 <- 0.209
-n_c2 <- 0.148
-n_c3 <- 0.283
-n_d <- 0.300
-n_e <- 0.0605
-
 m_zh <-  function(data)   {
   
   data_zh <- data %>% 
@@ -317,7 +336,15 @@ m_zh <-  function(data)   {
 }
 
 
-# Montecarlo para cada función --------------------------------------------
+# 3RA parte ---------------------------------------------------------------
+
+### LUEGO DE DEFINIR LAS FUNCIONES PARA CADA MUESTREO Y CADA ESCALA DEL MUESTREO ESPACIALIZADO
+### SE ITERA 50 VECES POR CADA UNA (MONTECARLO), PARA ESTIMAR UN ERROR PROMEDIO DE CADA MUESTREO
+### PARA CADA TAMAÑO MUESTRAL DEFINIDO (EN EL PASO N°1)
+
+# 3.1 Montecarlo para cada función ----------------------------------------
+
+### MUESTREO ALEATORIO, ESTRATIFICADO Y ESPACIALIZADO POR GEOGRAFIAS CENSALES Y BARRIOS
 
 # Muestreo aleatorio 
 m_aleatorio <-  data.frame()
@@ -394,6 +421,13 @@ for (n in sample_br) {
   m_esp_barrio <- bind_rows(m_esp_barrio, data_merge)
 }
 
+# 3.2 Montecarlo para función ZONAS HOMOGÉNEAS ----------------------------------------
+
+### Itera por la zonificación de cada floor
+### tomando una muestra aleatoria (50 veces) y encontrando el error promedio
+
+### FLOOR 1500
+
 # Definir floor y leer datos
 floor <- 1500 
 data <- readRDS(glue("Output/Maxp_Stgo_cluster_f{floor}.Rds"))
@@ -420,6 +454,9 @@ for (n in sample_zh) {
   
   m_esp_zh_1500 <- bind_rows(m_esp_zh_1500, data_merge)
 }
+
+
+### FLOOR 2000
 
 # Definir floor y leer datos
 floor <- 2000 
@@ -448,6 +485,9 @@ for (n in sample_zh) {
   m_esp_zh_2000 <- bind_rows(m_esp_zh_2000, data_merge)
 }
 
+
+### FLOOR 2500
+
 # Definir floor y leer datos
 floor <- 2500 
 data <- readRDS(glue("Output/Maxp_Stgo_cluster_f{floor}.Rds"))
@@ -459,7 +499,7 @@ max_c3 <- 516L
 max_d <- 392L
 max_e <- 77L
 
-# Zona Homogenea - floor 2000  
+# Zona Homogenea - floor 2500  
 m_esp_zh_2500 <-  data.frame()
 
 for (n in sample_zh) {
@@ -475,6 +515,8 @@ for (n in sample_zh) {
   m_esp_zh_2500 <- bind_rows(m_esp_zh_2500, data_merge)
 }
 
+
+### FLOOR 10000
 
 # Definir floor y leer datos
 floor <- 10000 
@@ -503,8 +545,11 @@ for (n in sample_zh) {
   m_esp_zh_10000 <- bind_rows(m_esp_zh_10000, data_merge)
 }
 
-# Grafico -----------------------------------------------------------------
+# 4. Grafico -----------------------------------------------------------------
 
+### UNIR Y GRAFICAR LOS RESULTADOS DEL MONTECARLO PARA CADA TAMAÑO MUESTRAL Y CADA METODO DE MUESTREO
+
+# Unir resultados montecarlo
 muestreo <-  bind_rows(
                        m_aleatorio,
                        m_estrat,
@@ -524,7 +569,7 @@ muestreo <-  bind_rows(
 muestreo %>% filter(sample<3000) %>% arrange(tipo, sample) %>% write.csv2("Montecarlo/muestreo.csv", row.names = FALSE)
 test <- read.csv2("Montecarlo/muestreo.csv")
 
-
+# Definir colores gráfico
 paleta <- c(
             "Aleatorio" = "#FF0000", 
             "Estratificado" = "#CC0066", 
@@ -536,6 +581,7 @@ paleta <- c(
             "Espacializado - ZH f2500" = "#00CED1", 
             "Espacializado - ZH f10000" = "#008080")
 
+# Definir etiquetas gráfico
 etiquetas <- c(
   "Aleatorio" = "Random", 
   "Estratificado" = "Stratified", 
@@ -547,7 +593,6 @@ etiquetas <- c(
   "Espacializado - ZH f2500" = "Spatial - Zoning floor 2500", 
   "Espacializado - ZH f10000" = "Spatial - Zoning floor 10000"
 )
-
 
 
 # Plotear curva de tendencia
@@ -578,12 +623,11 @@ muestreo %>% filter(sample<3000) %>%
     legend.position="bottom"
   )
 
-# Plotear valores montecarlo
+# Plotear valores montecarlo (valores reales en lugar de curva de tendencia)
 muestreo %>% filter(sample<3000) %>% 
   ggplot(aes(sample, error, color = tipo)) +
   geom_line(lwd = 1 ) +
   scale_y_continuous(labels = scales::percent_format(accuracy = .1)) +
-  #geom_smooth(method = "loess", se = FALSE, formula = y ~ log(x)) +
   labs( x = "Sample", y = "Error",
         title ="Mean error by sampling method",
         subtitle = NULL,
