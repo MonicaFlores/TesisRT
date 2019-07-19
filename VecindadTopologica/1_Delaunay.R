@@ -13,6 +13,8 @@ options(scipen=999)
 
 # setwd("/Users/MoniFlores/Desktop/Tesis RT/Data")
 setwd("C:/Users/CEDEUS 18/Documents/CEDEUS/Monica - 2018/15_TesisRT/Data")
+setwd
+
 
 ####### Triangulation [Creacion de Vecinos]  #####
 
